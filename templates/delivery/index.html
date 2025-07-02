@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}ホーム - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">物流共同配送最適化システム</h1>
+        <p class="lead">複数荷主の商品を効率的に配送するための最適化システムです。</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-box-seam" style="font-size: 3rem; color: #0d6efd;"></i>
+                <h5 class="card-title mt-3">商品管理</h5>
+                <p class="card-text">配送する商品の情報を管理します</p>
+                <a href="{% url 'delivery:product_list' %}" class="btn btn-primary">商品一覧へ</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-truck" style="font-size: 3rem; color: #198754;"></i>
+                <h5 class="card-title mt-3">トラック管理</h5>
+                <p class="card-text">配送用トラックの情報を管理します</p>
+                <a href="{% url 'delivery:truck_list' %}" class="btn btn-success">トラック一覧へ</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-calculator" style="font-size: 3rem; color: #dc3545;"></i>
+                <h5 class="card-title mt-3">配送最適化</h5>
+                <p class="card-text">最適な配送計画を自動生成します</p>
+                <a href="{% url 'delivery:optimize' %}" class="btn btn-danger">最適化実行へ</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12">
+        <h2>システムの特徴</h2>
+        <ul class="list-group">
+            <li class="list-group-item">
+                <i class="bi bi-check-circle text-success"></i>
+                2Dビンパッキングアルゴリズムによる効率的な積載配置
+            </li>
+            <li class="list-group-item">
+                <i class="bi bi-check-circle text-success"></i>
+                複数荷主の共同配送に対応
+            </li>
+            <li class="list-group-item">
+                <i class="bi bi-check-circle text-success"></i>
+                配送期限を考慮した自動スケジューリング
+            </li>
+            <li class="list-group-item">
+                <i class="bi bi-check-circle text-success"></i>
+                最短経路での配送ルート最適化
+            </li>
+            <li class="list-group-item">
+                <i class="bi bi-check-circle text-success"></i>
+                積載状況と配送ルートの可視化
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">登録状況</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td>登録商品数:</td>
+                        <td class="text-end">{{ product_count }} 個</td>
+                    </tr>
+                    <tr>
+                        <td>登録トラック数:</td>
+                        <td class="text-end">{{ truck_count }} 台</td>
+                    </tr>
+                    <tr>
+                        <td>荷主数:</td>
+                        <td class="text-end">{{ shipper_count }} 社</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

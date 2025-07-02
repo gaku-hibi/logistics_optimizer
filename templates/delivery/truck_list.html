@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}トラック一覧 - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>トラック一覧</h1>
+    </div>
+    <div class="col-auto">
+        <a href="{% url 'admin:delivery_truck_add' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> 新規登録
+        </a>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>トラック名/番号</th>
+                <th>荷台サイズ (cm)</th>
+                <th>荷台面積 (m²)</th>
+                <th>最大積載量 (kg)</th>
+                <th>登録日</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for truck in trucks %}
+            <tr>
+                <td>{{ truck.name }}</td>
+                <td>{{ truck.bed_width }} × {{ truck.bed_depth }}</td>
+                <td>{{ truck.bed_area_m2|floatformat:2 }}</td>
+                <td>{{ truck.max_weight }}</td>
+                <td>{{ truck.created_at|date:"Y/m/d" }}</td>
+                <td>
+                    <a href="{% url 'admin:delivery_truck_change' truck.id %}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center text-muted">トラックが登録されていません</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if is_paginated %}
+<nav>
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">前へ</a>
+        </li>
+        {% endif %}
+        
+        {% for num in page_obj.paginator.page_range %}
+        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+        </li>
+        {% endfor %}
+        
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}">次へ</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

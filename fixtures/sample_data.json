@@ -1,0 +1,179 @@
+[
+  {
+    "model": "delivery.shipper",
+    "pk": 1,
+    "fields": {
+      "name": "株式会社ABC商事",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.shipper",
+    "pk": 2,
+    "fields": {
+      "name": "XYZ物流株式会社",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.shipper",
+    "pk": 3,
+    "fields": {
+      "name": "サンプル貿易株式会社",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.truck",
+    "pk": 1,
+    "fields": {
+      "name": "トラック1号",
+      "bed_width": 250.0,
+      "bed_depth": 500.0,
+      "max_weight": 2000.0,
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.truck",
+    "pk": 2,
+    "fields": {
+      "name": "トラック2号",
+      "bed_width": 200.0,
+      "bed_depth": 400.0,
+      "max_weight": 1500.0,
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.truck",
+    "pk": 3,
+    "fields": {
+      "name": "トラック3号",
+      "bed_width": 300.0,
+      "bed_depth": 600.0,
+      "max_weight": 3000.0,
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.product",
+    "pk": 1,
+    "fields": {
+      "shipper": 1,
+      "name": "電子機器A",
+      "width": 60.0,
+      "height": 40.0,
+      "depth": 80.0,
+      "weight": 50.0,
+      "destination_address": "東京都新宿区西新宿2-8-1",
+      "delivery_deadline": "2025-07-05T17:00:00Z",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.product",
+    "pk": 2,
+    "fields": {
+      "shipper": 1,
+      "name": "電子機器B",
+      "width": 50.0,
+      "height": 30.0,
+      "depth": 60.0,
+      "weight": 30.0,
+      "destination_address": "東京都渋谷区渋谷2-21-1",
+      "delivery_deadline": "2025-07-05T17:00:00Z",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.product",
+    "pk": 3,
+    "fields": {
+      "shipper": 2,
+      "name": "家具セットA",
+      "width": 120.0,
+      "height": 80.0,
+      "depth": 100.0,
+      "weight": 150.0,
+      "destination_address": "東京都港区六本木6-10-1",
+      "delivery_deadline": "2025-07-05T17:00:00Z",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.product",
+    "pk": 4,
+    "fields": {
+      "shipper": 2,
+      "name": "家具セットB",
+      "width": 100.0,
+      "height": 60.0,
+      "depth": 80.0,
+      "weight": 100.0,
+      "destination_address": "東京都品川区上大崎2-10-1",
+      "delivery_deadline": "2025-07-05T17:00:00Z",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.product",
+    "pk": 5,
+    "fields": {
+      "shipper": 3,
+      "name": "食品パレットA",
+      "width": 80.0,
+      "height": 50.0,
+      "depth": 100.0,
+      "weight": 200.0,
+      "destination_address": "東京都台東区浅草1-1-1",
+      "delivery_deadline": "2025-07-05T17:00:00Z",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.product",
+    "pk": 6,
+    "fields": {
+      "shipper": 3,
+      "name": "食品パレットB",
+      "width": 70.0,
+      "height": 40.0,
+      "depth": 90.0,
+      "weight": 180.0,
+      "destination_address": "東京都墨田区押上1-1-2",
+      "delivery_deadline": "2025-07-05T17:00:00Z",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.product",
+    "pk": 7,
+    "fields": {
+      "shipper": 1,
+      "name": "精密機器C",
+      "width": 40.0,
+      "height": 30.0,
+      "depth": 50.0,
+      "weight": 25.0,
+      "destination_address": "東京都千代田区有楽町1-12-1",
+      "delivery_deadline": "2025-07-06T17:00:00Z",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "delivery.product",
+    "pk": 8,
+    "fields": {
+      "shipper": 2,
+      "name": "オフィス用品セット",
+      "width": 90.0,
+      "height": 70.0,
+      "depth": 110.0,
+      "weight": 120.0,
+      "destination_address": "東京都中央区日本橋1-4-1",
+      "delivery_deadline": "2025-07-06T17:00:00Z",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  }
+]

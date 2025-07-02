@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=logistics_optimizer
+      - POSTGRES_USER=hibigaku
+      - POSTGRES_PASSWORD=kddi0077
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "hibigaku"]
+      interval: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  web:
+    build: .
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py create_superuser &&
+             python manage.py loaddata fixtures/sample_data.json &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://hibigaku:kddi0077@db:5432/logistics_optimizer
+      - DEBUG=True
+
+volumes:
+  postgres_data:

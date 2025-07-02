@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block title %}配送最適化 - 物流共同配送最適化システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .truck-visualization {
+        border: 2px solid #333;
+        background: #f8f9fa;
+        position: relative;
+        margin: 10px 0;
+    }
+    .product-box {
+        position: absolute;
+        border: 1px solid #007bff;
+        background: rgba(0, 123, 255, 0.2);
+        font-size: 10px;
+        padding: 2px;
+        overflow: hidden;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">配送最適化</h1>
+
+<form method="post" id="optimizeForm">
+    {% csrf_token %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">最適化パラメータ</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="dispatch_date" class="form-label">発送日</label>
+                        <input type="date" class="form-control" id="dispatch_date" name="dispatch_date" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="dispatch_time" class="form-label">発送時刻</label>
+                        <input type="time" class="form-control" id="dispatch_time" name="dispatch_time" required>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="depot_address" class="form-label">倉庫住所</label>
+                <input type="text" class="form-control" id="depot_address" name="depot_address" 
+                       value="東京都千代田区丸の内1-9-1" required>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-calculator"></i> 最適化実行
+            </button>
+        </div>
+    </div>
+</form>
+
+{% if results %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">最適化結果</h5>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <strong>必要トラック数: {{ results.total_trucks_needed }} 台</strong>
+            {% if results.unassigned_products %}
+            <br><span class="text-danger">割り当て不可商品: {{ results.unassigned_products|length }} 個</span>
+            {% endif %}
+        </div>
+
+        {% for assignment in results.truck_assignments %}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0">{{ assignment.truck_name }} - {{ assignment.date }}</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>積載情報</h6>
+                        <ul class="list-unstyled">
+                            <li>商品数: {{ assignment.products|length }} 個</li>
+                            <li>総重量: {{ assignment.total_weight|floatformat:1 }} kg</li>
+                            <li>荷台使用率: {{ assignment.utilization|floatformat:1 }}%</li>
+                        </ul>
+                        
+                        <h6>配送商品</h6>
+                        <ul>
+                            {% for product in assignment.products %}
+                            <li>{{ product.name }} ({{ product.shipper_name }})</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>配送ルート</h6>
+                        <ol>
+                            <li>倉庫出発</li>
+                            {% for dest in assignment.route %}
+                            <li>{{ dest }}</li>
+                            {% endfor %}
+                            <li>倉庫帰着</li>
+                        </ol>
+                        <ul class="list-unstyled mt-3">
+                            <li>総走行距離: {{ assignment.total_distance|floatformat:1 }} km</li>
+                            <li>推定所要時間: {{ assignment.estimated_time|floatformat:0 }} 分</li>
+                            <li>到着予定: {{ assignment.estimated_arrival|date:"H:i" }}</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <h6 class="mt-3">積載配置図</h6>
+                <div class="truck-visualization" 
+                     style="width: 100%; height: 300px;"
+                     data-truck-width="{{ assignment.truck_width }}"
+                     data-truck-depth="{{ assignment.truck_depth }}"
+                     data-products='{{ assignment.packing_data|safe }}'>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if results.unassigned_products %}
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h6 class="mb-0">割り当て不可商品</h6>
+            </div>
+            <div class="card-body">
+                <p class="text-danger">以下の商品は利用可能なトラックに積載できませんでした。</p>
+                <ul>
+                    {% for product in results.unassigned_products %}
+                    <li>{{ product.name }} - {{ product.destination_address }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 今日の日付をデフォルトに設定
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dispatch_date').value = today;
+    document.getElementById('dispatch_time').value = '09:00';
+    
+    // 積載配置の可視化
+    document.querySelectorAll('.truck-visualization').forEach(function(viz) {
+        const truckWidth = parseFloat(viz.dataset.truckWidth);
+        const truckDepth = parseFloat(viz.dataset.truckDepth);
+        const products = JSON.parse(viz.dataset.products || '[]');
+        
+        const scale = Math.min(viz.offsetWidth / truckWidth, viz.offsetHeight / truckDepth) * 0.9;
+        
+        products.forEach(function(product) {
+            const box = document.createElement('div');
+            box.className = 'product-box';
+            box.style.left = (product.x * scale) + 'px';
+            box.style.top = (product.y * scale) + 'px';
+            box.style.width = (product.width * scale) + 'px';
+            box.style.height = (product.depth * scale) + 'px';
+            box.textContent = product.id;
+            viz.appendChild(box);
+        });
+    });
+});
+</script>
+{% endblock %}
