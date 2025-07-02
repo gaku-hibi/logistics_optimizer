@@ -6,6 +6,7 @@
 
 - **商品管理**: サイズ、重量、配送先、期限等の管理
 - **トラック管理**: 荷台サイズ、積載量等の管理
+- **CSVインポート**: 商品・トラック情報の一括取り込み
 - **2Dビンパッキング最適化**: First Fit Decreasingアルゴリズムによる効率的な積載
 - **配送ルート最適化**: Nearest Neighbor法による最短経路探索
 - **配送スケジュール計算**: 移動時間と作業時間を考慮した到着時刻推定
@@ -76,8 +77,13 @@ python manage.py runserver
 
 2. **商品・トラックの登録**
    - 管理画面または各一覧画面から新規登録
+   - CSVファイルによる一括取り込みも可能
 
-3. **配送最適化の実行**
+3. **CSVファイルの取り込み**
+   - 商品一覧・トラック一覧画面の「CSV取り込み」ボタンをクリック
+   - サンプルCSVファイル: `sample_csv/` ディレクトリを参照
+
+4. **配送最適化の実行**
    - 「配送最適化」メニューから実行
    - 発送日時と倉庫住所を指定
    - 最適化結果が表示される
@@ -89,6 +95,36 @@ python manage.py runserver
 - 荷主: 3社
 - トラック: 3台（異なるサイズ）
 - 商品: 8個（異なるサイズ・配送先）
+
+## CSVファイル形式
+
+### 商品CSV（products_sample.csv）
+```csv
+shipper_name,name,width,height,depth,weight,destination_address,delivery_deadline
+株式会社ABC商事,電子機器D,70,45,90,60,東京都新宿区歌舞伎町1-1-1,2025-07-10 17:00
+```
+
+必須カラム:
+- `shipper_name`: 荷主名
+- `name`: 商品名
+- `width`: 幅(cm)
+- `height`: 高さ(cm)
+- `depth`: 奥行き(cm)
+- `weight`: 重量(kg)
+- `destination_address`: 配送先住所
+- `delivery_deadline`: 配送期限 (YYYY-MM-DD HH:MM)
+
+### トラックCSV（trucks_sample.csv）
+```csv
+name,bed_width,bed_depth,max_weight
+トラック4号,280,520,2500
+```
+
+必須カラム:
+- `name`: トラック名/番号
+- `bed_width`: 荷台幅(cm)
+- `bed_depth`: 荷台奥行き(cm)
+- `max_weight`: 最大積載量(kg)
 
 ## 技術仕様
 

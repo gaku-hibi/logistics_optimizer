@@ -8,9 +8,60 @@
         <h1>商品一覧</h1>
     </div>
     <div class="col-auto">
+        <button type="button" class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#csvImportModal">
+            <i class="bi bi-file-earmark-arrow-up"></i> CSV取り込み
+        </button>
         <a href="{% url 'admin:delivery_product_add' %}" class="btn btn-primary">
             <i class="bi bi-plus-circle"></i> 新規登録
         </a>
+    </div>
+</div>
+
+<!-- CSV取り込みモーダル -->
+<div class="modal fade" id="csvImportModal" tabindex="-1" aria-labelledby="csvImportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="csvImportModalLabel">商品CSV取り込み</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        {{ csv_form.csv_file.label_tag }}
+                        {{ csv_form.csv_file }}
+                        <div class="form-text">{{ csv_form.csv_file.help_text }}</div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <h6>CSVファイル形式</h6>
+                        <p class="mb-2">以下のカラムが必要です：</p>
+                        <ul class="mb-0">
+                            <li><strong>shipper_name</strong>: 荷主名</li>
+                            <li><strong>name</strong>: 商品名</li>
+                            <li><strong>width</strong>: 幅(cm)</li>
+                            <li><strong>height</strong>: 高さ(cm)</li>
+                            <li><strong>depth</strong>: 奥行き(cm)</li>
+                            <li><strong>weight</strong>: 重量(kg)</li>
+                            <li><strong>destination_address</strong>: 配送先住所</li>
+                            <li><strong>delivery_deadline</strong>: 配送期限 (YYYY-MM-DD HH:MM)</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <small>
+                            <i class="bi bi-exclamation-triangle"></i>
+                            ファイルはUTF-8エンコーディングで保存してください。
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="submit" class="btn btn-success">取り込み実行</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 

@@ -2,11 +2,15 @@ from django.shortcuts import render, redirect
 from django.views.generic import ListView, TemplateView
 from django.contrib import messages
 from django.utils import timezone
+from django.http import HttpResponse
 from datetime import datetime
 import json
+import csv
+import io
 
 from .models import Product, Truck, Shipper, DeliveryPlan, TruckAssignment, ProductAssignment
 from .algorithms import DeliveryOptimizer
+from .forms import ProductCSVUploadForm, TruckCSVUploadForm
 
 
 class IndexView(TemplateView):
@@ -28,6 +32,79 @@ class ProductListView(ListView):
     
     def get_queryset(self):
         return Product.objects.select_related('shipper').order_by('-created_at')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['csv_form'] = ProductCSVUploadForm()
+        return context
+    
+    def post(self, request, *args, **kwargs):
+        form = ProductCSVUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            return self.import_csv(request, form.cleaned_data['csv_file'])
+        else:
+            for error in form.errors.values():
+                messages.error(request, error[0])
+            return redirect('delivery:product_list')
+    
+    def import_csv(self, request, csv_file):
+        try:
+            decoded_file = csv_file.read().decode('utf-8')
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string)
+            
+            created_count = 0
+            error_count = 0
+            
+            for row_num, row in enumerate(reader, start=2):
+                try:
+                    # 荷主を取得または作成
+                    shipper, _ = Shipper.objects.get_or_create(
+                        name=row['shipper_name'].strip()
+                    )
+                    
+                    # 配送期限の変換
+                    delivery_deadline = datetime.strptime(
+                        row['delivery_deadline'].strip(), 
+                        '%Y-%m-%d %H:%M'
+                    )
+                    delivery_deadline = timezone.make_aware(delivery_deadline)
+                    
+                    # 商品作成
+                    Product.objects.create(
+                        shipper=shipper,
+                        name=row['name'].strip(),
+                        width=float(row['width']),
+                        height=float(row['height']),
+                        depth=float(row['depth']),
+                        weight=float(row['weight']),
+                        destination_address=row['destination_address'].strip(),
+                        delivery_deadline=delivery_deadline
+                    )
+                    created_count += 1
+                    
+                except Exception as e:
+                    error_count += 1
+                    messages.warning(
+                        request, 
+                        f'行{row_num}: {str(e)}'
+                    )
+            
+            if created_count > 0:
+                messages.success(
+                    request, 
+                    f'{created_count}件の商品を正常に取り込みました。'
+                )
+            if error_count > 0:
+                messages.warning(
+                    request, 
+                    f'{error_count}件の取り込みに失敗しました。'
+                )
+            
+        except Exception as e:
+            messages.error(request, f'CSVファイルの処理中にエラーが発生しました: {str(e)}')
+        
+        return redirect('delivery:product_list')
 
 
 class TruckListView(ListView):
@@ -44,7 +121,60 @@ class TruckListView(ListView):
         # 荷台面積を平方メートルに変換
         for truck in context['trucks']:
             truck.bed_area_m2 = truck.bed_area / 10000  # cm² to m²
+        context['csv_form'] = TruckCSVUploadForm()
         return context
+    
+    def post(self, request, *args, **kwargs):
+        form = TruckCSVUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            return self.import_csv(request, form.cleaned_data['csv_file'])
+        else:
+            for error in form.errors.values():
+                messages.error(request, error[0])
+            return redirect('delivery:truck_list')
+    
+    def import_csv(self, request, csv_file):
+        try:
+            decoded_file = csv_file.read().decode('utf-8')
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string)
+            
+            created_count = 0
+            error_count = 0
+            
+            for row_num, row in enumerate(reader, start=2):
+                try:
+                    # トラック作成
+                    Truck.objects.create(
+                        name=row['name'].strip(),
+                        bed_width=float(row['bed_width']),
+                        bed_depth=float(row['bed_depth']),
+                        max_weight=float(row['max_weight'])
+                    )
+                    created_count += 1
+                    
+                except Exception as e:
+                    error_count += 1
+                    messages.warning(
+                        request, 
+                        f'行{row_num}: {str(e)}'
+                    )
+            
+            if created_count > 0:
+                messages.success(
+                    request, 
+                    f'{created_count}件のトラックを正常に取り込みました。'
+                )
+            if error_count > 0:
+                messages.warning(
+                    request, 
+                    f'{error_count}件の取り込みに失敗しました。'
+                )
+            
+        except Exception as e:
+            messages.error(request, f'CSVファイルの処理中にエラーが発生しました: {str(e)}')
+        
+        return redirect('delivery:truck_list')
 
 
 class OptimizeView(TemplateView):
