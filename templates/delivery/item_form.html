@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'delivery:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'delivery:item_list' %}">商品一覧</a></li>
+                <li class="breadcrumb-item active">{{ title }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-box text-primary"></i>
+                    {{ title }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {% crispy form %}
+                </form>
+            </div>
+        </div>
+
+        <!-- パレタイズ判定ヘルプ -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle text-info"></i>
+                    パレタイズ判定について
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info" role="alert">
+                    <h6>標準パレットサイズ: 110cm × 110cm</h6>
+                    <ul class="mb-0">
+                        <li>商品の幅・奥行がパレットサイズ以下の場合、パレタイズ可能</li>
+                        <li>パレタイズ不可の商品は、トラックにバラ積みされます</li>
+                        <li>積み上げ高さの上限は150cmです</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const widthInput = document.getElementById('id_width');
+    const depthInput = document.getElementById('id_depth');
+    const heightInput = document.getElementById('id_height');
+    
+    function updatePalletStatus() {
+        const width = parseInt(widthInput.value) || 0;
+        const depth = parseInt(depthInput.value) || 0;
+        const height = parseInt(heightInput.value) || 0;
+        
+        // パレタイズ判定の動的表示
+        if (width > 0 && depth > 0) {
+            let statusHtml = '';
+            if (width <= 110 && depth <= 110) {
+                statusHtml = '<div class="alert alert-success mt-2"><i class="fas fa-check"></i> パレタイズ可能</div>';
+            } else {
+                statusHtml = '<div class="alert alert-warning mt-2"><i class="fas fa-exclamation-triangle"></i> パレタイズ不可（バラ積み）</div>';
+            }
+            
+            // 既存の状態表示を削除
+            const existingStatus = document.querySelector('.pallet-status');
+            if (existingStatus) {
+                existingStatus.remove();
+            }
+            
+            // 新しい状態表示を追加
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'pallet-status';
+            statusDiv.innerHTML = statusHtml;
+            depthInput.parentNode.appendChild(statusDiv);
+        }
+        
+        // 体積計算
+        if (width > 0 && depth > 0 && height > 0) {
+            const volume = width * depth * height;
+            const volumeText = `体積: ${volume.toLocaleString()}cm³`;
+            
+            const existingVolume = document.querySelector('.volume-display');
+            if (existingVolume) {
+                existingVolume.textContent = volumeText;
+            } else {
+                const volumeDiv = document.createElement('small');
+                volumeDiv.className = 'volume-display text-muted';
+                volumeDiv.textContent = volumeText;
+                heightInput.parentNode.appendChild(volumeDiv);
+            }
+        }
+    }
+    
+    widthInput.addEventListener('input', updatePalletStatus);
+    depthInput.addEventListener('input', updatePalletStatus);
+    heightInput.addEventListener('input', updatePalletStatus);
+    
+    // 初期表示
+    updatePalletStatus();
+});
+</script>
+{% endblock %}

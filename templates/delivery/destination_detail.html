@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% block title %}配送先詳細 - {{ destination.name }} - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'delivery:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'delivery:destination_list' %}">配送先一覧</a></li>
+                <li class="breadcrumb-item active">{{ destination.name }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- 基本情報 -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-map-marker-alt text-primary"></i>
+                    配送先情報
+                </h4>
+                <div>
+                    <a href="{% url 'delivery:destination_update' destination.pk %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-edit"></i> 編集
+                    </a>
+                    <a href="{% url 'delivery:destination_delete' destination.pk %}" class="btn btn-outline-danger btn-sm">
+                        <i class="fas fa-trash"></i> 削除
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">配送先名:</th>
+                                <td>{{ destination.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>住所:</th>
+                                <td>{{ destination.address }}</td>
+                            </tr>
+                            <tr>
+                                <th>郵便番号:</th>
+                                <td>{{ destination.postal_code|default:"未設定" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">電話番号:</th>
+                                <td>
+                                    {% if destination.contact_phone %}
+                                        <i class="fas fa-phone"></i> {{ destination.contact_phone }}
+                                    {% else %}
+                                        <span class="text-muted">未設定</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>座標:</th>
+                                <td>
+                                    {% if destination.latitude and destination.longitude %}
+                                        {{ destination.latitude|floatformat:6 }}, {{ destination.longitude|floatformat:6 }}
+                                    {% else %}
+                                        <span class="text-muted">未設定</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>登録日:</th>
+                                <td>{{ destination.created_at|date:"Y年m月d日" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 最近の出荷依頼 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-clipboard-list text-info"></i>
+                    最近の出荷依頼
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_orders %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>依頼番号</th>
+                                    <th>荷主</th>
+                                    <th>配送日</th>
+                                    <th>状態</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recent_orders %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'delivery:order_detail' order.pk %}">
+                                            {{ order.order_number }}
+                                        </a>
+                                    </td>
+                                    <td>{{ order.shipper.name }}</td>
+                                    <td>{{ order.delivery_deadline|date:"m/d" }}</td>
+                                    <td>
+                                        {% if order.planorderdetail_set.exists %}
+                                            <span class="badge bg-success">計画済</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">未計画</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">出荷依頼がありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- 操作ボタン -->
+        <div class="card">
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'delivery:destination_update' destination.pk %}" class="btn btn-primary">
+                        <i class="fas fa-edit"></i> 編集
+                    </a>
+                    <a href="{% url 'delivery:destination_delete' destination.pk %}" class="btn btn-outline-danger">
+                        <i class="fas fa-trash"></i> 削除
+                    </a>
+                    <a href="{% url 'delivery:destination_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 一覧に戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 地図表示（座標が設定されている場合） -->
+        {% if destination.latitude and destination.longitude %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-map"></i>
+                    位置情報
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="text-center">
+                    <p class="small text-muted">
+                        緯度: {{ destination.latitude|floatformat:6 }}<br>
+                        経度: {{ destination.longitude|floatformat:6 }}
+                    </p>
+                    <a href="https://maps.google.com/?q={{ destination.latitude }},{{ destination.longitude }}" 
+                       target="_blank" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-external-link-alt"></i> Google Maps で開く
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 統計情報 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i>
+                    統計情報
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-12">
+                        <h4 class="text-primary">{{ recent_orders.count }}</h4>
+                        <small class="text-muted">配送依頼数</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block title %}商品詳細 - {{ item.name }} - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'delivery:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'delivery:item_list' %}">商品一覧</a></li>
+                <li class="breadcrumb-item active">{{ item.item_code }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-box text-primary"></i>
+                    {{ item.name }}
+                    <small class="text-muted">{{ item.item_code }}</small>
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">品目コード:</th>
+                                <td><code>{{ item.item_code }}</code></td>
+                            </tr>
+                            <tr>
+                                <th>商品名:</th>
+                                <td>{{ item.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>幅:</th>
+                                <td>
+                                    {% if item.width %}{{ item.width }}cm{% else %}<span class="text-muted">未設定</span>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>奥行:</th>
+                                <td>
+                                    {% if item.depth %}{{ item.depth }}cm{% else %}<span class="text-muted">未設定</span>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>高さ:</th>
+                                <td>
+                                    {% if item.height %}{{ item.height }}cm{% else %}<span class="text-muted">未設定</span>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>重量:</th>
+                                <td>
+                                    {% if item.weight %}{{ item.weight }}kg{% else %}<span class="text-muted">未設定</span>{% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">体積:</th>
+                                <td>
+                                    {% if item.volume > 0 %}
+                                        {{ item.volume|floatformat:0 }}cm³
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>セット品PCS数:</th>
+                                <td>{{ item.parts_count }}</td>
+                            </tr>
+                            <tr>
+                                <th>パレタイズ:</th>
+                                <td>
+                                    {% if item.width and item.depth and item.width <= 110 and item.depth <= 110 %}
+                                        <span class="badge bg-success">可能</span>
+                                        <br><small class="text-muted">標準パレット(110×110cm)に収まります</small>
+                                    {% elif item.width and item.depth %}
+                                        <span class="badge bg-warning">不可</span>
+                                        <br><small class="text-muted">標準パレットサイズを超過</small>
+                                    {% else %}
+                                        <span class="badge bg-secondary">判定不可</span>
+                                        <br><small class="text-muted">サイズ情報が不足</small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 部品情報 -->
+        {% if parts %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-puzzle-piece text-info"></i>
+                    構成部品
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>部品コード</th>
+                                <th>サイズ</th>
+                                <th>重量</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for part in parts %}
+                            <tr>
+                                <td><code>{{ part.parts_code }}</code></td>
+                                <td>{{ part.width }}×{{ part.depth }}×{{ part.height }}cm</td>
+                                <td>{{ part.weight }}kg</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <!-- サイズ可視化 -->
+        {% if item.width and item.depth and item.height %}
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-cube"></i>
+                    サイズ可視化
+                </h6>
+            </div>
+            <div class="card-body text-center">
+                <div class="border" style="width: 150px; height: 100px; margin: 0 auto; position: relative; background: linear-gradient(45deg, #f8f9fa 25%, transparent 25%, transparent 75%, #f8f9fa 75%), linear-gradient(45deg, #f8f9fa 25%, transparent 25%, transparent 75%, #f8f9fa 75%); background-size: 20px 20px; background-position: 0 0, 10px 10px;">
+                    <div class="position-absolute top-50 start-50 translate-middle">
+                        <small class="fw-bold">
+                            {{ item.width }}×{{ item.depth }}<br>
+                            ×{{ item.height }}cm
+                        </small>
+                    </div>
+                </div>
+                <small class="text-muted mt-2 d-block">
+                    体積: {{ item.volume|floatformat:0 }}cm³
+                </small>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 操作ボタン -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'delivery:item_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 一覧に戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 統計情報 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i>
+                    使用統計
+                </h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    この商品の出荷履歴や配送計画での使用状況がここに表示されます。
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

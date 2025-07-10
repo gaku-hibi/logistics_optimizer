@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+
+{% block title %}トラック詳細 - {{ truck.shipping_company }} {{ truck.truck_class }} - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'delivery:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'delivery:truck_list' %}">トラック一覧</a></li>
+                <li class="breadcrumb-item active">{{ truck.shipping_company }} {{ truck.truck_class }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-truck text-primary"></i>
+                    {{ truck.shipping_company }} {{ truck.truck_class }}
+                    {% if truck.model %}
+                        <small class="text-muted">{{ truck.model }}</small>
+                    {% endif %}
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">運送会社:</th>
+                                <td>{{ truck.shipping_company|default:"-" }}</td>
+                            </tr>
+                            <tr>
+                                <th>車格:</th>
+                                <td>
+                                    {% if truck.truck_class %}
+                                        <span class="badge bg-info">{{ truck.truck_class }}</span>
+                                    {% else %}
+                                        <span class="text-muted">未設定</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>車種:</th>
+                                <td>{{ truck.model|default:"-" }}</td>
+                            </tr>
+                            <tr>
+                                <th>荷台幅:</th>
+                                <td>{{ truck.width }}cm</td>
+                            </tr>
+                            <tr>
+                                <th>荷台奥行:</th>
+                                <td>{{ truck.depth }}cm</td>
+                            </tr>
+                            <tr>
+                                <th>荷台高さ:</th>
+                                <td>{{ truck.height }}cm</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">荷台面積:</th>
+                                <td>{{ truck.floor_area|floatformat:0 }}cm²</td>
+                            </tr>
+                            <tr>
+                                <th>荷台容積:</th>
+                                <td>{{ truck.volume|floatformat:0 }}cm³</td>
+                            </tr>
+                            <tr>
+                                <th>最大積載量:</th>
+                                <td>{{ truck.payload }}kg</td>
+                            </tr>
+                            <tr>
+                                <th>パレット収容数:</th>
+                                <td>
+                                    {% widthratio truck.floor_area 12100 1 %}台
+                                    <small class="text-muted">(110×110cmパレット)</small>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 最近の配送計画 -->
+        {% if recent_plans %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history text-info"></i>
+                    最近の配送計画
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>計画ID</th>
+                                <th>配送日</th>
+                                <th>積載重量</th>
+                                <th>積載率</th>
+                                <th>作成日時</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for plan in recent_plans %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'delivery:plan_detail' plan.pk %}">
+                                        #{{ plan.id }}
+                                    </a>
+                                </td>
+                                <td>{{ plan.plan_date|date:"m/d" }}</td>
+                                <td>{{ plan.total_weight|floatformat:1 }}kg</td>
+                                <td>
+                                    {% widthratio plan.total_weight truck.payload 100 %}%
+                                </td>
+                                <td>{{ plan.created_at|date:"m/d H:i" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <!-- 荷台可視化 -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-square"></i>
+                    荷台レイアウト
+                </h6>
+            </div>
+            <div class="card-body text-center">
+                <div class="border border-2" 
+                     style="width: 200px; height: 150px; margin: 0 auto; position: relative; background: #f8f9fa;">
+                    <div class="position-absolute top-50 start-50 translate-middle">
+                        <small class="fw-bold">
+                            {{ truck.width }}cm<br>
+                            ×<br>
+                            {{ truck.depth }}cm
+                        </small>
+                    </div>
+                </div>
+                <small class="text-muted mt-2 d-block">
+                    荷台面積: {{ truck.floor_area|floatformat:0 }}cm²
+                </small>
+            </div>
+        </div>
+
+        <!-- 操作ボタン -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'delivery:truck_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 一覧に戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 仕様情報 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i>
+                    仕様情報
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <h6 class="text-primary">{{ truck.floor_area|floatformat:0 }}</h6>
+                            <small class="text-muted">荷台面積<br>(cm²)</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-success">{{ truck.payload }}</h6>
+                        <small class="text-muted">最大積載量<br>(kg)</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

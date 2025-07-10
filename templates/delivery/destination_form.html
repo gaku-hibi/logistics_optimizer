@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'delivery:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'delivery:destination_list' %}">配送先一覧</a></li>
+                <li class="breadcrumb-item active">{{ title }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-plus text-primary"></i>
+            {{ title }}
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-map-marker-alt"></i>
+                    配送先情報
+                </h5>
+            </div>
+            <div class="card-body">
+                {% crispy form %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i>
+                    入力ガイド
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <strong>配送先名</strong><br>
+                        <small class="text-muted">会社名、店舗名、または個人名を入力してください</small>
+                    </li>
+                    <li class="mb-2">
+                        <strong>住所</strong><br>
+                        <small class="text-muted">詳細な住所を町丁目まで入力してください</small>
+                    </li>
+                    <li class="mb-2">
+                        <strong>郵便番号</strong><br>
+                        <small class="text-muted">ハイフンありまたはなしで入力可能です</small>
+                    </li>
+                    <li class="mb-2">
+                        <strong>座標</strong><br>
+                        <small class="text-muted">緯度・経度（任意）。ルート最適化に使用されます</small>
+                    </li>
+                    <li class="mb-2">
+                        <strong>連絡先</strong><br>
+                        <small class="text-muted">配送時の連絡先電話番号を入力してください</small>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-body text-center">
+                <a href="{% url 'delivery:destination_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> 一覧に戻る
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

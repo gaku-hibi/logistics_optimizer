@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+
+{% block title %}出荷依頼一覧 - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="fas fa-list text-primary"></i>
+                出荷依頼一覧
+            </h1>
+            <a href="{% url 'delivery:order_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> 新規作成
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 検索フィルター -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">検索</label>
+                        <input type="text" class="form-control" name="search" 
+                               value="{{ request.GET.search }}" 
+                               placeholder="依頼番号、配送先、荷主名で検索">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">配送日</label>
+                        <input type="date" class="form-control" name="delivery_date" 
+                               value="{{ request.GET.delivery_date }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <div>
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="fas fa-search"></i> 検索
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 一覧テーブル -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% if orders %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>依頼番号</th>
+                                    <th>荷主</th>
+                                    <th>配送先</th>
+                                    <th>配送日</th>
+                                    <th>作成日時</th>
+                                    <th>状態</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in orders %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'delivery:order_detail' order.pk %}" class="text-decoration-none">
+                                            {{ order.order_number }}
+                                        </a>
+                                    </td>
+                                    <td>{{ order.shipper.name }}</td>
+                                    <td>
+                                        <div>{{ order.destination.name }}</div>
+                                        <small class="text-muted">{{ order.destination.address|truncatechars:30 }}</small>
+                                    </td>
+                                    <td>{{ order.delivery_deadline|date:"Y/m/d" }}</td>
+                                    <td>{{ order.created_at|date:"m/d H:i" }}</td>
+                                    <td>
+                                        {% if order.planorderdetail_set.exists %}
+                                            <span class="badge bg-success">配送計画済</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">未計画</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'delivery:order_detail' order.pk %}" 
+                                               class="btn btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'delivery:order_update' order.pk %}" 
+                                               class="btn btn-outline-secondary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ページネーション -->
+                    {% if orders.has_other_pages %}
+                        <nav aria-label="ページネーション">
+                            <ul class="pagination justify-content-center">
+                                {% if orders.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ orders.previous_page_number }}">前へ</a>
+                                    </li>
+                                {% endif %}
+
+                                {% for num in orders.paginator.page_range %}
+                                    {% if orders.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% if orders.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ orders.next_page_number }}">次へ</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">出荷依頼がありません</h5>
+                        <p class="text-muted">新しい出荷依頼を作成してください。</p>
+                        <a href="{% url 'delivery:order_create' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> 新規作成
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

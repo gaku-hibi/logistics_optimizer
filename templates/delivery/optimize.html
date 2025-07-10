@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}配送最適化 - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-magic text-success"></i>
+            配送最適化
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cogs"></i>
+                    最適化実行
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="target_date" class="form-label">対象日</label>
+                        <select class="form-select" name="target_date" id="target_date" required>
+                            <option value="">-- 日付を選択 --</option>
+                            {% for date in pending_dates %}
+                                <option value="{{ date|date:'Y-m-d' }}">
+                                    {{ date|date:'Y年m月d日' }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            未配送依頼がある日付のみ表示されています。
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-magic"></i>
+                            最適化実行
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 最適化説明 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i>
+                    最適化について
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6>実行される最適化処理：</h6>
+                <ol>
+                    <li><strong>パレタイズ設計</strong>
+                        <ul>
+                            <li>標準パレット（110cm × 110cm）に収まる商品のパレット詰め</li>
+                            <li>First Fit Decreasing アルゴリズムによる最適配置</li>
+                        </ul>
+                    </li>
+                    <li><strong>トラック積載設計</strong>
+                        <ul>
+                            <li>2Dビンパッキングによるトラック荷台への積載最適化</li>
+                            <li>重量制限・容積制限の考慮</li>
+                        </ul>
+                    </li>
+                    <li><strong>配送ルート最適化</strong>
+                        <ul>
+                            <li>同一地域内での配送先の巡回順序最適化</li>
+                            <li>Nearest Neighbor法による距離最小化</li>
+                        </ul>
+                    </li>
+                </ol>
+                
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-lightbulb"></i>
+                    <strong>ヒント：</strong>
+                    最適化は同じ配送日の出荷依頼をまとめて処理し、
+                    トラック数を最小化しながら効率的な配送計画を作成します。
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- 統計情報 -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i>
+                    未配送依頼統計
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if pending_dates %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>配送日</th>
+                                    <th class="text-end">件数</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for date in pending_dates %}
+                                <tr>
+                                    <td>{{ date|date:"m/d" }}</td>
+                                    <td class="text-end">
+                                        <span class="badge bg-warning">
+                                            {{ date.order_count|default:"-" }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                        <p class="text-muted">
+                            未配送の依頼はありません
+                        </p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- 最近の最適化結果 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history"></i>
+                    最近の配送計画
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <!-- 最近の計画を表示（実装時に追加） -->
+                    <div class="text-center py-3">
+                        <small class="text-muted">最近の配送計画が表示されます</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const submitBtn = document.querySelector('button[type="submit"]');
+    
+    form.addEventListener('submit', function() {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 最適化実行中...';
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block title %}配送計画一覧 - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="fas fa-route text-success"></i>
+                配送計画一覧
+            </h1>
+            <div>
+                <a href="{% url 'delivery:optimize_delivery' %}" class="btn btn-success">
+                    <i class="fas fa-magic"></i> 最適化実行
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 検索フィルター -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">配送日</label>
+                        <input type="date" class="form-control" name="plan_date" 
+                               value="{{ request.GET.plan_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div>
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="fas fa-search"></i> 検索
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 一覧テーブル -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% if plans %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>計画ID</th>
+                                    <th>配送日</th>
+                                    <th>トラック</th>
+                                    <th>出発時刻</th>
+                                    <th>積載重量</th>
+                                    <th>積載率</th>
+                                    <th>配送先数</th>
+                                    <th>作成日時</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for plan in plans %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'delivery:plan_detail' plan.pk %}" class="text-decoration-none">
+                                            #{{ plan.id }}
+                                        </a>
+                                    </td>
+                                    <td>{{ plan.plan_date|date:"Y/m/d" }}</td>
+                                    <td>
+                                        <div>{{ plan.truck.shipping_company }}</div>
+                                        <small class="text-muted">{{ plan.truck.truck_class }} {{ plan.truck.model }}</small>
+                                    </td>
+                                    <td>{{ plan.departure_time|time:"H:i" }}</td>
+                                    <td>{{ plan.total_weight|floatformat:1 }}kg</td>
+                                    <td>
+                                        {% widthratio plan.total_weight plan.truck.payload 100 as load_rate %}
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar {% if load_rate > 80 %}bg-danger{% elif load_rate > 60 %}bg-warning{% else %}bg-success{% endif %}" 
+                                                 style="width: {{ load_rate }}%">
+                                                {{ load_rate }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ plan.order_details.count }}</td>
+                                    <td>{{ plan.created_at|date:"m/d H:i" }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'delivery:plan_detail' plan.pk %}" 
+                                               class="btn btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'delivery:plan_report' plan.pk %}" 
+                                               class="btn btn-outline-secondary">
+                                                <i class="fas fa-file-pdf"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ページネーション -->
+                    {% if plans.has_other_pages %}
+                        <nav aria-label="ページネーション">
+                            <ul class="pagination justify-content-center">
+                                {% if plans.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ plans.previous_page_number }}{% if request.GET.plan_date %}&plan_date={{ request.GET.plan_date }}{% endif %}">前へ</a>
+                                    </li>
+                                {% endif %}
+
+                                {% for num in plans.paginator.page_range %}
+                                    {% if plans.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ num }}{% if request.GET.plan_date %}&plan_date={{ request.GET.plan_date }}{% endif %}">{{ num }}</a>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% if plans.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ plans.next_page_number }}{% if request.GET.plan_date %}&plan_date={{ request.GET.plan_date }}{% endif %}">次へ</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-route fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">配送計画がありません</h5>
+                        <p class="text-muted">最適化を実行して配送計画を作成してください。</p>
+                        <a href="{% url 'delivery:optimize_delivery' %}" class="btn btn-success">
+                            <i class="fas fa-magic"></i> 最適化実行
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

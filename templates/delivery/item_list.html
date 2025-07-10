@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block title %}商品一覧 - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="fas fa-boxes text-primary"></i>
+                商品一覧
+            </h1>
+            <a href="{% url 'delivery:item_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> 新規登録
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 検索フィルター -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">検索</label>
+                        <input type="text" class="form-control" name="search" 
+                               value="{{ request.GET.search }}" 
+                               placeholder="品目コード、商品名で検索">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div>
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="fas fa-search"></i> 検索
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 一覧テーブル -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% if items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>品目コード</th>
+                                    <th>商品名</th>
+                                    <th>サイズ</th>
+                                    <th>重量</th>
+                                    <th>体積</th>
+                                    <th>セット数</th>
+                                    <th>パレット可</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'delivery:item_detail' item.pk %}" class="text-decoration-none">
+                                            <code>{{ item.item_code }}</code>
+                                        </a>
+                                    </td>
+                                    <td>{{ item.name }}</td>
+                                    <td>
+                                        {% if item.width and item.depth and item.height %}
+                                            {{ item.width }}×{{ item.depth }}×{{ item.height }}cm
+                                        {% else %}
+                                            <small class="text-muted">未設定</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.weight %}
+                                            {{ item.weight }}kg
+                                        {% else %}
+                                            <small class="text-muted">未設定</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.volume > 0 %}
+                                            {{ item.volume|floatformat:0 }}cm³
+                                        {% else %}
+                                            <small class="text-muted">-</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.parts_count }}</td>
+                                    <td>
+                                        {% if item.width and item.depth and item.width <= 110 and item.depth <= 110 %}
+                                            <span class="badge bg-success">可</span>
+                                        {% elif item.width and item.depth %}
+                                            <span class="badge bg-warning">不可</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'delivery:item_detail' item.pk %}" 
+                                               class="btn btn-outline-info" title="詳細">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'delivery:item_update' item.pk %}" 
+                                               class="btn btn-outline-primary" title="編集">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'delivery:item_delete' item.pk %}" 
+                                               class="btn btn-outline-danger" title="削除">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ページネーション -->
+                    {% if items.has_other_pages %}
+                        <nav aria-label="ページネーション">
+                            <ul class="pagination justify-content-center">
+                                {% if items.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ items.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">前へ</a>
+                                    </li>
+                                {% endif %}
+
+                                {% for num in items.paginator.page_range %}
+                                    {% if items.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">{{ num }}</a>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% if items.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ items.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">次へ</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">商品がありません</h5>
+                        <p class="text-muted">新しい商品を登録してください。</p>
+                        <a href="{% url 'delivery:item_create' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> 新規登録
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

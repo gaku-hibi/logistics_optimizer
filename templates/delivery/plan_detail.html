@@ -1,0 +1,317 @@
+{% extends 'base.html' %}
+
+{% block title %}配送計画詳細 - 計画#{{ plan.id }} - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'delivery:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'delivery:plan_list' %}">配送計画一覧</a></li>
+                <li class="breadcrumb-item active">計画#{{ plan.id }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- 基本情報 -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-route text-success"></i>
+                    配送計画 #{{ plan.id }}
+                </h4>
+                <div>
+                    <a href="{% url 'delivery:plan_report' plan.id %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-file-pdf"></i> PDFダウンロード
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">配送日:</th>
+                                <td>{{ plan.plan_date|date:"Y年m月d日" }}</td>
+                            </tr>
+                            <tr>
+                                <th>出発時刻:</th>
+                                <td>{{ plan.departure_time|time:"H:i" }}</td>
+                            </tr>
+                            <tr>
+                                <th>使用車両:</th>
+                                <td>
+                                    <a href="{% url 'delivery:truck_detail' plan.truck.pk %}">
+                                        {{ plan.truck.shipping_company }} {{ plan.truck.truck_class }}
+                                    </a><br>
+                                    <small class="text-muted">{{ plan.truck.model }}</small>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">積載重量:</th>
+                                <td>
+                                    {{ plan.total_weight|floatformat:1 }}kg / {{ plan.truck.payload }}kg
+                                    {% widthratio plan.total_weight plan.truck.payload 100 as load_rate %}
+                                    <div class="progress mt-1" style="height: 15px;">
+                                        <div class="progress-bar {% if load_rate > 80 %}bg-danger{% elif load_rate > 60 %}bg-warning{% else %}bg-success{% endif %}" 
+                                             style="width: {{ load_rate }}%">
+                                            {{ load_rate }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>積載体積:</th>
+                                <td>{{ plan.total_volume|floatformat:0 }}cm³</td>
+                            </tr>
+                            <tr>
+                                <th>走行距離:</th>
+                                <td>
+                                    {% if plan.route_distance_km %}
+                                        {{ plan.route_distance_km|floatformat:1 }}km
+                                    {% else %}
+                                        <span class="text-muted">未計算</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 配送ルート -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-map-marked-alt text-info"></i>
+                    配送ルート
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if order_details %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>順序</th>
+                                    <th>出荷依頼</th>
+                                    <th>配送先</th>
+                                    <th>住所</th>
+                                    <th>到着予定</th>
+                                    <th>移動時間</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for detail in order_details %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-primary">{{ detail.delivery_sequence }}</span>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'delivery:order_detail' detail.shipping_order.pk %}">
+                                            {{ detail.shipping_order.order_number }}
+                                        </a>
+                                    </td>
+                                    <td>{{ detail.shipping_order.destination.name }}</td>
+                                    <td>
+                                        <small>{{ detail.shipping_order.destination.address|truncatechars:40 }}</small>
+                                    </td>
+                                    <td>{{ detail.estimated_arrival|time:"H:i" }}</td>
+                                    <td>{{ detail.travel_time_minutes }}分</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">配送先がありません。</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 積載商品 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-boxes text-warning"></i>
+                    積載商品
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if item_loads %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>商品名</th>
+                                    <th>出荷依頼</th>
+                                    <th>数量</th>
+                                    <th>配置位置</th>
+                                    <th>回転</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for load in item_loads %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'delivery:item_detail' load.item.pk %}">
+                                            {{ load.item.name }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'delivery:order_detail' load.shipping_order.pk %}">
+                                            {{ load.shipping_order.order_number }}
+                                        </a>
+                                    </td>
+                                    <td>{{ load.quantity }}</td>
+                                    <td>({{ load.position_x }}, {{ load.position_y }})</td>
+                                    <td>{{ load.rotation }}°</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">積載商品がありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- 操作ボタン -->
+        <div class="card">
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'delivery:plan_report' plan.id %}" class="btn btn-primary">
+                        <i class="fas fa-file-pdf"></i> PDF出力
+                    </a>
+                    <a href="{% url 'delivery:plan_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 一覧に戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- トラック積載図 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-square"></i>
+                    トラック積載図
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="truck-layout" class="border" style="width: 100%; height: 300px; position: relative; background: #f8f9fa;">
+                    <!-- JavaScript で描画 -->
+                </div>
+                <small class="text-muted mt-2 d-block text-center">
+                    荷台サイズ: {{ plan.truck.width }}×{{ plan.truck.depth }}cm
+                </small>
+            </div>
+        </div>
+
+        <!-- 統計情報 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i>
+                    統計情報
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <h6 class="text-primary">{{ order_details.count }}</h6>
+                            <small class="text-muted">配送先数</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-success">{{ item_loads.count }}</h6>
+                        <small class="text-muted">積載商品</small>
+                    </div>
+                </div>
+                <hr>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <h6 class="text-info">{{ plan.total_weight|floatformat:0 }}</h6>
+                            <small class="text-muted">重量(kg)</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-warning">{{ plan.total_volume|floatformat:0 }}</h6>
+                        <small class="text-muted">体積(cm³)</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // トラック積載図の描画
+    const truckLayout = {{ truck_layout|safe }};
+    const container = document.getElementById('truck-layout');
+    
+    if (truckLayout && container) {
+        const scale = Math.min(
+            container.clientWidth / truckLayout.width,
+            container.clientHeight / truckLayout.depth
+        ) * 0.8;
+        
+        container.innerHTML = '';
+        
+        // 荷台の描画
+        const truck = document.createElement('div');
+        truck.style.cssText = `
+            position: absolute;
+            width: ${truckLayout.width * scale}px;
+            height: ${truckLayout.depth * scale}px;
+            border: 2px solid #333;
+            background: #fff;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        `;
+        container.appendChild(truck);
+        
+        // 商品の描画
+        truckLayout.items.forEach((item, index) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.style.cssText = `
+                position: absolute;
+                left: ${item.x * scale}px;
+                top: ${item.y * scale}px;
+                width: ${item.width * scale}px;
+                height: ${item.depth * scale}px;
+                background: hsl(${(index * 40) % 360}, 70%, 80%);
+                border: 1px solid #333;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 8px;
+                font-weight: bold;
+                transform: rotate(${item.rotation}deg);
+            `;
+            itemDiv.textContent = item.name.substring(0, 6) + (item.quantity > 1 ? ` x${item.quantity}` : '');
+            itemDiv.title = `${item.name} x${item.quantity}`;
+            truck.appendChild(itemDiv);
+        });
+    }
+});
+</script>
+{% endblock %}

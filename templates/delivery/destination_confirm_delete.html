@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}配送先削除確認 - {{ destination.name }} - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'delivery:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'delivery:destination_list' %}">配送先一覧</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'delivery:destination_detail' destination.pk %}">{{ destination.name }}</a></li>
+                <li class="breadcrumb-item active">削除確認</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    削除確認
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-danger" role="alert">
+                    <strong>警告:</strong> この操作は元に戻すことができません。
+                </div>
+                
+                <p class="lead">
+                    以下の配送先を削除しようとしています：
+                </p>
+                
+                <div class="bg-light p-3 rounded mb-4">
+                    <h5>{{ destination.name }}</h5>
+                    <p class="mb-1"><strong>住所:</strong> {{ destination.address }}</p>
+                    {% if destination.postal_code %}
+                        <p class="mb-1"><strong>郵便番号:</strong> {{ destination.postal_code }}</p>
+                    {% endif %}
+                    {% if destination.contact_phone %}
+                        <p class="mb-1"><strong>電話:</strong> {{ destination.contact_phone }}</p>
+                    {% endif %}
+                    {% if destination.latitude and destination.longitude %}
+                        <p class="mb-0"><strong>座標:</strong> {{ destination.latitude|floatformat:6 }}, {{ destination.longitude|floatformat:6 }}</p>
+                    {% endif %}
+                </div>
+
+                {% if related_orders_count > 0 %}
+                    <div class="alert alert-warning" role="alert">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>注意:</strong> この配送先には {{ related_orders_count }} 件の出荷依頼が関連付けられています。
+                        削除すると、関連する出荷依頼も削除される可能性があります。
+                    </div>
+                {% endif %}
+
+                <form method="post" class="d-flex gap-3 justify-content-end">
+                    {% csrf_token %}
+                    <a href="{% url 'delivery:destination_detail' destination.pk %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> キャンセル
+                    </a>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> 削除実行
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

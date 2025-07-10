@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block title %}荷主詳細 - {{ shipper.name }} - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'delivery:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'delivery:shipper_list' %}">荷主一覧</a></li>
+                <li class="breadcrumb-item active">{{ shipper.name }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- 基本情報 -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-building text-primary"></i>
+                    荷主情報
+                </h4>
+                <div>
+                    <a href="{% url 'delivery:shipper_update' shipper.pk %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-edit"></i> 編集
+                    </a>
+                    <a href="{% url 'delivery:shipper_delete' shipper.pk %}" class="btn btn-outline-danger btn-sm">
+                        <i class="fas fa-trash"></i> 削除
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">荷主コード:</th>
+                                <td><code>{{ shipper.shipper_code }}</code></td>
+                            </tr>
+                            <tr>
+                                <th>荷主名:</th>
+                                <td>{{ shipper.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>住所:</th>
+                                <td>{{ shipper.address }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">電話番号:</th>
+                                <td>
+                                    {% if shipper.contact_phone %}
+                                        <i class="fas fa-phone"></i> {{ shipper.contact_phone }}
+                                    {% else %}
+                                        <span class="text-muted">未設定</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>メール:</th>
+                                <td>
+                                    {% if shipper.contact_email %}
+                                        <i class="fas fa-envelope"></i> {{ shipper.contact_email }}
+                                    {% else %}
+                                        <span class="text-muted">未設定</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>登録日:</th>
+                                <td>{{ shipper.created_at|date:"Y年m月d日" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 最近の出荷依頼 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-clipboard-list text-info"></i>
+                    最近の出荷依頼
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_orders %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>依頼番号</th>
+                                    <th>配送先</th>
+                                    <th>配送日</th>
+                                    <th>状態</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recent_orders %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'delivery:order_detail' order.pk %}">
+                                            {{ order.order_number }}
+                                        </a>
+                                    </td>
+                                    <td>{{ order.destination.name }}</td>
+                                    <td>{{ order.delivery_deadline|date:"m/d" }}</td>
+                                    <td>
+                                        {% if order.planorderdetail_set.exists %}
+                                            <span class="badge bg-success">計画済</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">未計画</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">出荷依頼がありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- 操作ボタン -->
+        <div class="card">
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'delivery:shipper_update' shipper.pk %}" class="btn btn-primary">
+                        <i class="fas fa-edit"></i> 編集
+                    </a>
+                    <a href="{% url 'delivery:shipper_delete' shipper.pk %}" class="btn btn-outline-danger">
+                        <i class="fas fa-trash"></i> 削除
+                    </a>
+                    <a href="{% url 'delivery:shipper_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 一覧に戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 統計情報 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i>
+                    統計情報
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-12">
+                        <h4 class="text-primary">{{ recent_orders.count }}</h4>
+                        <small class="text-muted">出荷依頼数</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

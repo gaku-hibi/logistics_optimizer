@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+{% load math_filters %}
+
+{% block title %}出荷依頼詳細 - {{ order.order_number }} - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'delivery:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'delivery:order_list' %}">出荷依頼一覧</a></li>
+                <li class="breadcrumb-item active">{{ order.order_number }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-box text-primary"></i>
+                    出荷依頼 {{ order.order_number }}
+                </h4>
+                <div>
+                    {% if order.planorderdetail_set.exists %}
+                        <span class="badge bg-success">配送計画済</span>
+                    {% else %}
+                        <span class="badge bg-warning">未計画</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">依頼番号:</th>
+                                <td>{{ order.order_number }}</td>
+                            </tr>
+                            <tr>
+                                <th>荷主:</th>
+                                <td>
+                                    {{ order.shipper.name }}<br>
+                                    <small class="text-muted">{{ order.shipper.shipper_code }}</small>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>配送先:</th>
+                                <td>
+                                    {{ order.destination.name }}<br>
+                                    <small class="text-muted">{{ order.destination.address }}</small>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>配送期限:</th>
+                                <td>{{ order.delivery_deadline|date:"Y年m月d日" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="30%">作成日時:</th>
+                                <td>{{ order.created_at|date:"Y/m/d H:i" }}</td>
+                            </tr>
+                            <tr>
+                                <th>更新日時:</th>
+                                <td>{{ order.updated_at|date:"Y/m/d H:i" }}</td>
+                            </tr>
+                            <tr>
+                                <th>合計重量:</th>
+                                <td>
+                                    {% if total_weight %}
+                                        {{ total_weight|floatformat:1 }}kg
+                                    {% else %}
+                                        <span class="text-muted">未設定</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>合計体積:</th>
+                                <td>
+                                    {% if total_volume %}
+                                        {{ total_volume|floatformat:0 }}cm³
+                                    {% else %}
+                                        <span class="text-muted">未設定</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 出荷商品一覧 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list text-info"></i>
+                    出荷商品一覧
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if order_items %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>品目コード</th>
+                                    <th>商品名</th>
+                                    <th>数量</th>
+                                    <th>単位重量</th>
+                                    <th>合計重量</th>
+                                    <th>単位体積</th>
+                                    <th>合計体積</th>
+                                    <th>パレット可</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in order_items %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'delivery:item_detail' item.item.pk %}">
+                                            <code>{{ item.item.item_code }}</code>
+                                        </a>
+                                    </td>
+                                    <td>{{ item.item.name }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>
+                                        {% if item.item.weight %}
+                                            {{ item.item.weight }}kg
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.item.weight %}
+                                            {{ item.item.weight|mul:item.quantity|floatformat:1 }}kg
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.item.volume %}
+                                            {{ item.item.volume|floatformat:0 }}cm³
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.item.volume %}
+                                            {{ item.item.volume|mul:item.quantity|floatformat:0 }}cm³
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.item.width and item.item.depth and item.item.width <= 110 and item.item.depth <= 110 %}
+                                            <span class="badge bg-success">可</span>
+                                        {% elif item.item.width and item.item.depth %}
+                                            <span class="badge bg-warning">不可</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">出荷商品が登録されていません</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- 操作ボタン -->
+        <div class="card">
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'delivery:order_update' order.pk %}" class="btn btn-primary">
+                        <i class="fas fa-edit"></i> 編集
+                    </a>
+                    <a href="{% url 'delivery:order_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 一覧に戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 配送計画情報 -->
+        {% if order.planorderdetail_set.exists %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-route text-success"></i>
+                    配送計画
+                </h6>
+            </div>
+            <div class="card-body">
+                {% for detail in order.planorderdetail_set.all %}
+                <div class="mb-2">
+                    <a href="{% url 'delivery:plan_detail' detail.plan.pk %}" class="text-decoration-none">
+                        計画 #{{ detail.plan.id }}
+                    </a><br>
+                    <small class="text-muted">
+                        {{ detail.plan.plan_date|date:"m/d" }} {{ detail.estimated_arrival|time:"H:i" }}到着予定
+                        （配送順序: {{ detail.delivery_sequence }}）
+                    </small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 統計情報 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i>
+                    統計情報
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <h6 class="text-primary">{{ order_items.count }}</h6>
+                            <small class="text-muted">商品種類</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-success">
+                            {% for item in order_items %}{{ item.quantity }}{% if not forloop.last %}+{% endif %}{% endfor %}
+                        </h6>
+                        <small class="text-muted">総数量</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 乗算フィルター（JavaScript版）
+document.addEventListener('DOMContentLoaded', function() {
+    // Djangoテンプレートでmulフィルターが使えない場合の代替
+});
+</script>
+{% endblock %}

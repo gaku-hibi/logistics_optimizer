@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}ダッシュボード - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-tachometer-alt text-primary"></i>
+            ダッシュボード
+        </h1>
+    </div>
+</div>
+
+<!-- 統計カード -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6">
+        <div class="card stats-card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ total_orders }}</h4>
+                        <p class="mb-0">総出荷依頼数</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-box fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="card stats-card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ pending_orders }}</h4>
+                        <p class="mb-0">未配送依頼</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="card stats-card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ total_plans }}</h4>
+                        <p class="mb-0">配送計画数</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-route fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="card stats-card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ total_trucks }}</h4>
+                        <p class="mb-0">登録車両数</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-truck fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 最新情報 -->
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list-alt text-primary"></i>
+                    最新の出荷依頼
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_orders %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>依頼番号</th>
+                                    <th>配送先</th>
+                                    <th>期限日</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recent_orders %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'delivery:order_detail' order.pk %}">
+                                            {{ order.order_number }}
+                                        </a>
+                                    </td>
+                                    <td>{{ order.destination.name }}</td>
+                                    <td>{{ order.delivery_deadline|date:"m/d" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-center">
+                        <a href="{% url 'delivery:order_list' %}" class="btn btn-sm btn-outline-primary">
+                            すべて表示
+                        </a>
+                    </div>
+                {% else %}
+                    <p class="text-muted">出荷依頼がありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-route text-success"></i>
+                    最新の配送計画
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_plans %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>計画ID</th>
+                                    <th>配送日</th>
+                                    <th>車両</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for plan in recent_plans %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'delivery:plan_detail' plan.pk %}">
+                                            #{{ plan.id }}
+                                        </a>
+                                    </td>
+                                    <td>{{ plan.plan_date|date:"m/d" }}</td>
+                                    <td>{{ plan.truck.shipping_company }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-center">
+                        <a href="{% url 'delivery:plan_list' %}" class="btn btn-sm btn-outline-success">
+                            すべて表示
+                        </a>
+                    </div>
+                {% else %}
+                    <p class="text-muted">配送計画がありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- クイックアクション -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bolt text-warning"></i>
+                    クイックアクション
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <a href="{% url 'delivery:order_create' %}" class="btn btn-primary btn-lg w-100 mb-2">
+                            <i class="fas fa-plus-circle"></i><br>
+                            新規出荷依頼
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{% url 'delivery:optimize_delivery' %}" class="btn btn-success btn-lg w-100 mb-2">
+                            <i class="fas fa-magic"></i><br>
+                            配送最適化
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{% url 'delivery:truck_create' %}" class="btn btn-info btn-lg w-100 mb-2">
+                            <i class="fas fa-truck"></i><br>
+                            車両登録
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{% url 'delivery:data_import' %}" class="btn btn-secondary btn-lg w-100 mb-2">
+                            <i class="fas fa-upload"></i><br>
+                            データ取込
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

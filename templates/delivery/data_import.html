@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}データ取込 - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-upload text-primary"></i>
+            データ取込
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-file-csv"></i>
+                    CSVファイルインポート
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="import_type" class="form-label">インポートタイプ</label>
+                        <select class="form-select" name="import_type" id="import_type" required>
+                            <option value="">-- 選択してください --</option>
+                            <option value="items">商品マスタ</option>
+                            <option value="shippers">荷主マスタ</option>
+                            <option value="destinations">配送先マスタ</option>
+                            <option value="trucks">トラックマスタ</option>
+                            <option value="orders">出荷依頼</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="csv_file" class="form-label">CSVファイル</label>
+                        <input type="file" class="form-control" name="csv_file" id="csv_file" 
+                               accept=".csv" required>
+                        <div class="form-text">
+                            UTF-8エンコードのCSVファイルを選択してください。
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i>
+                            インポート実行
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- インポート実装予告 -->
+        <div class="alert alert-info mt-4" role="alert">
+            <i class="fas fa-info-circle"></i>
+            <strong>お知らせ:</strong>
+            CSVインポート機能は現在実装中です。管理画面からのデータ登録をご利用ください。
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- CSVフォーマット例 -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-download"></i>
+                    CSVフォーマット
+                </h6>
+            </div>
+            <div class="card-body">
+                <h6>商品マスタ</h6>
+                <pre class="bg-light p-2 small">item_code,name,width,depth,height,weight
+A001,ノートPC,30,20,3,1.5
+A002,デスクトップPC,40,35,40,8.0</pre>
+                
+                <h6 class="mt-3">荷主マスタ</h6>
+                <pre class="bg-light p-2 small">shipper_code,name,address,contact_phone
+S001,ABC電機株式会社,東京都千代田区,03-1234-5678</pre>
+                
+                <h6 class="mt-3">配送先マスタ</h6>
+                <pre class="bg-light p-2 small">name,address,postal_code,latitude,longitude
+東京本社,東京都千代田区神田1-1-1,101-0001,35.6915,139.7731</pre>
+            </div>
+        </div>
+        
+        <!-- 注意事項 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                    注意事項
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success"></i> ファイルはUTF-8で保存してください</li>
+                    <li><i class="fas fa-check text-success"></i> 1行目はヘッダー行として認識されます</li>
+                    <li><i class="fas fa-check text-success"></i> 必須項目が空の場合はエラーになります</li>
+                    <li><i class="fas fa-check text-success"></i> 既存データと重複する場合は更新されます</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const importTypeSelect = document.getElementById('import_type');
+    const csvFileInput = document.getElementById('csv_file');
+    
+    importTypeSelect.addEventListener('change', function() {
+        // インポートタイプに応じてファイル名の例を更新
+        const type = this.value;
+        if (type) {
+            csvFileInput.placeholder = type + '.csv';
+        }
+    });
+    
+    // ファイル選択時のバリデーション
+    csvFileInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                alert('CSVファイルを選択してください。');
+                this.value = '';
+                return;
+            }
+            
+            if (file.size > 5 * 1024 * 1024) { // 5MB制限
+                alert('ファイルサイズは5MB以下にしてください。');
+                this.value = '';
+                return;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

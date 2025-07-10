@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} - 物流共同配送最適化システム{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'delivery:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'delivery:truck_list' %}">トラック一覧</a></li>
+                <li class="breadcrumb-item active">{{ title }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-truck text-primary"></i>
+                    {{ title }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {% crispy form %}
+                </form>
+            </div>
+        </div>
+
+        <!-- トラック仕様ヘルプ -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle text-info"></i>
+                    トラック仕様について
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>一般的な車格別仕様</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>2tトラック:</strong> 荷台 200×400cm、積載2000kg</li>
+                            <li><strong>4tトラック:</strong> 荷台 220×450cm、積載4000kg</li>
+                            <li><strong>10tトラック:</strong> 荷台 240×600cm、積載10000kg</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-info" role="alert">
+                            <h6>入力のポイント</h6>
+                            <ul class="mb-0">
+                                <li>荷台サイズは実際に使用可能な内寸を入力</li>
+                                <li>積載量は法的制限値以下で入力</li>
+                                <li>高さ制限も考慮して入力してください</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const widthInput = document.getElementById('id_width');
+    const depthInput = document.getElementById('id_depth');
+    const heightInput = document.getElementById('id_height');
+    const payloadInput = document.getElementById('id_payload');
+    
+    function updateTruckInfo() {
+        const width = parseInt(widthInput.value) || 0;
+        const depth = parseInt(depthInput.value) || 0;
+        const height = parseInt(heightInput.value) || 0;
+        const payload = parseInt(payloadInput.value) || 0;
+        
+        let infoHtml = '';
+        
+        if (width > 0 && depth > 0) {
+            const floorArea = width * depth;
+            const palletCount = Math.floor(floorArea / 12100); // 110x110cm = 12100cm²
+            
+            infoHtml += `<div class="alert alert-info mt-2">`;
+            infoHtml += `<strong>荷台面積:</strong> ${floorArea.toLocaleString()}cm²<br>`;
+            infoHtml += `<strong>パレット収容数:</strong> 約${palletCount}台<br>`;
+            
+            if (height > 0) {
+                const volume = width * depth * height;
+                infoHtml += `<strong>荷台容積:</strong> ${volume.toLocaleString()}cm³<br>`;
+            }
+            
+            // 車格判定
+            if (payload > 0) {
+                let truckClass = '';
+                if (payload <= 2500) truckClass = '2t';
+                else if (payload <= 5000) truckClass = '4t';
+                else if (payload <= 8000) truckClass = '6t';
+                else truckClass = '10t+';
+                
+                infoHtml += `<strong>推定車格:</strong> ${truckClass}クラス`;
+            }
+            
+            infoHtml += `</div>`;
+        }
+        
+        // 既存の情報表示を削除
+        const existingInfo = document.querySelector('.truck-info');
+        if (existingInfo) {
+            existingInfo.remove();
+        }
+        
+        if (infoHtml) {
+            // 新しい情報表示を追加
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'truck-info';
+            infoDiv.innerHTML = infoHtml;
+            payloadInput.parentNode.appendChild(infoDiv);
+        }
+    }
+    
+    widthInput.addEventListener('input', updateTruckInfo);
+    depthInput.addEventListener('input', updateTruckInfo);
+    heightInput.addEventListener('input', updateTruckInfo);
+    payloadInput.addEventListener('input', updateTruckInfo);
+    
+    // 初期表示
+    updateTruckInfo();
+});
+</script>
+{% endblock %}
