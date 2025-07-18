@@ -29,14 +29,15 @@
                         <label for="target_date" class="form-label">対象日</label>
                         <select class="form-select" name="target_date" id="target_date" required>
                             <option value="">-- 日付を選択 --</option>
-                            {% for date in pending_dates %}
-                                <option value="{{ date|date:'Y-m-d' }}">
-                                    {{ date|date:'Y年m月d日' }}
+                            {% for date_info in available_dates %}
+                                <option value="{{ date_info.date|date:'Y-m-d' }}">
+                                    {{ date_info.date|date:'Y年m月d日' }} ({{ date_info.pending_count }}件)
                                 </option>
                             {% endfor %}
                         </select>
                         <div class="form-text">
-                            未配送依頼がある日付のみ表示されています。
+                            <i class="fas fa-info-circle"></i>
+                            パレタイズ設計が完了し、未配送依頼がある日付のみ表示されています。
                         </div>
                     </div>
                     
@@ -59,12 +60,18 @@
                 </h5>
             </div>
             <div class="card-body">
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>前提条件：</strong>
+                    配送最適化を実行するには、事前に対象日のパレタイズ設計が完了している必要があります。
+                </div>
+                
                 <h6>実行される最適化処理：</h6>
                 <ol>
-                    <li><strong>パレタイズ設計</strong>
+                    <li><strong>パレタイズ結果の読み込み</strong>
                         <ul>
-                            <li>標準パレット（110cm × 110cm）に収まる商品のパレット詰め</li>
-                            <li>First Fit Decreasing アルゴリズムによる最適配置</li>
+                            <li>完了済みのパレタイズ設計データを取得</li>
+                            <li>パレット化商品とバラ積み商品の分類</li>
                         </ul>
                     </li>
                     <li><strong>トラック積載設計</strong>
@@ -97,27 +104,31 @@
             <div class="card-header">
                 <h5 class="card-title mb-0">
                     <i class="fas fa-chart-bar"></i>
-                    未配送依頼統計
+                    最適化可能日統計
                 </h5>
             </div>
             <div class="card-body">
-                {% if pending_dates %}
+                {% if available_dates %}
                     <div class="table-responsive">
                         <table class="table table-sm">
                             <thead>
                                 <tr>
                                     <th>配送日</th>
-                                    <th class="text-end">件数</th>
+                                    <th class="text-end">未配送件数</th>
+                                    <th class="text-center">パレタイズ</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for date in pending_dates %}
+                                {% for date_info in available_dates %}
                                 <tr>
-                                    <td>{{ date|date:"m/d" }}</td>
+                                    <td>{{ date_info.date|date:"m/d" }}</td>
                                     <td class="text-end">
                                         <span class="badge bg-warning">
-                                            {{ date.order_count|default:"-" }}
+                                            {{ date_info.pending_count }}
                                         </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <i class="fas fa-check-circle text-success" title="パレタイズ設計完了"></i>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -126,10 +137,13 @@
                     </div>
                 {% else %}
                     <div class="text-center py-4">
-                        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                        <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
                         <p class="text-muted">
-                            未配送の依頼はありません
+                            最適化可能な日付がありません
                         </p>
+                        <small class="text-muted">
+                            パレタイズ設計が完了した日付の未配送依頼がありません
+                        </small>
                     </div>
                 {% endif %}
             </div>

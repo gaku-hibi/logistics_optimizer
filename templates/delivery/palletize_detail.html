@@ -1,0 +1,559 @@
+{% extends 'base.html' %}
+
+{% block title %}パレタイズ設計詳細 - {{ palletize_plan.delivery_date|date:'Y年m月d日' }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">パレタイズ設計詳細</h1>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'delivery:palletize_list' %}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> 一覧へ戻る
+                    </a>
+                    <a href="{% url 'delivery:palletize_delete' palletize_plan.id %}" class="btn btn-outline-danger">
+                        <i class="bi bi-trash"></i> 削除
+                    </a>
+                </div>
+            </div>
+            
+            <!-- 基本情報 -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">配送日</h5>
+                            <p class="card-text fs-4">{{ palletize_plan.delivery_date|date:'Y年m月d日' }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">総商品数</h5>
+                            <p class="card-text fs-4">{{ palletize_plan.total_items }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">パレット数</h5>
+                            <p class="card-text fs-4">{{ palletize_plan.total_pallets }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">バラ積み数</h5>
+                            <p class="card-text fs-4">{{ palletize_plan.total_loose_items }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 関連する出荷依頼 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">関連する出荷依頼</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>出荷依頼番号</th>
+                                    <th>荷主</th>
+                                    <th>配送先</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in orders %}
+                                <tr>
+                                    <td>{{ order.order_number }}</td>
+                                    <td>{{ order.shipper.name }}</td>
+                                    <td>{{ order.destination.name }}</td>
+                                    <td>
+                                        <a href="{% url 'delivery:order_detail' order.id %}" class="btn btn-sm btn-outline-primary">
+                                            詳細
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- パレット詳細 -->
+            <h3 class="h5 mb-3">パレット詳細</h3>
+            {% for pallet in palletize_plan.pallets.all %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">パレット #{{ pallet.pallet_number }}</h5>
+                        <div>
+                            <span class="badge bg-info">積載率: {{ pallet.utilization|floatformat:1 }}%</span>
+                            <span class="badge bg-secondary">重量: {{ pallet.total_weight|floatformat:1 }}kg</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6>積載商品一覧</h6>
+                                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#pallet-items-{{ pallet.pallet_number }}" aria-expanded="false" aria-controls="pallet-items-{{ pallet.pallet_number }}">
+                                    <i class="fas fa-chevron-down"></i> 詳細表示
+                                </button>
+                            </div>
+                            
+                            <!-- 概要情報（詳細非表示時） -->
+                            <div class="collapse show" id="pallet-summary-{{ pallet.pallet_number }}">
+                                <div class="row mt-2">
+                                    <div class="col-md-6">
+                                        <div class="card border-0 bg-light">
+                                            <div class="card-body p-2">
+                                                <h6 class="card-title text-primary mb-1">積載概要</h6>
+                                                <p class="card-text mb-1">
+                                                    <strong>商品数:</strong> {{ pallet.items.count }}個<br>
+                                                    <strong>総重量:</strong> {{ pallet.total_weight|floatformat:1 }}kg<br>
+                                                    <strong>総容量:</strong> {{ pallet.total_volume|floatformat:0 }}cm³
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card border-0 bg-light">
+                                            <div class="card-body p-2">
+                                                <h6 class="card-title text-success mb-1">主な商品</h6>
+                                                <p class="card-text mb-0">
+                                                    {% for item in pallet.items.all|slice:":3" %}
+                                                        <span class="badge bg-secondary me-1">
+                                                            {% if item.part %}
+                                                                {{ item.part.parts_code }}
+                                                            {% else %}
+                                                                {{ item.item.item_code }}
+                                                            {% endif %}
+                                                        </span>
+                                                    {% endfor %}
+                                                    {% if pallet.items.count > 3 %}
+                                                        <span class="text-muted">...他{{ pallet.items.count|add:"-3" }}個</span>
+                                                    {% endif %}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="collapse" id="pallet-items-{{ pallet.pallet_number }}">
+                                <div class="table-responsive mt-2">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>品目コード</th>
+                                                <th>商品名</th>
+                                                <th>出荷依頼</th>
+                                                <th>サイズ (cm)</th>
+                                                <th>重量 (kg)</th>
+                                                <th>位置 (X, Y, Z)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in pallet.items.all %}
+                                            <tr>
+                                                <td>
+                                                    {% if item.part %}
+                                                        {{ item.part.parts_code }}
+                                                    {% else %}
+                                                        {{ item.item.item_code }}
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {{ item.item.name }}
+                                                    {% if item.part %}
+                                                        <small class="text-muted">(部品)</small>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <a href="{% url 'delivery:order_detail' item.shipping_order.id %}">
+                                                        {{ item.shipping_order.order_number }}
+                                                    </a>
+                                                </td>
+                                                <td>{{ item.width }} × {{ item.depth }} × {{ item.height }}</td>
+                                                <td>{{ item.weight|floatformat:1 }}</td>
+                                                <td>({{ item.position_x }}, {{ item.position_y }}, {{ item.position_z }})</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>パレット3D表示</h6>
+                            <div class="border p-2 bg-light">
+                                <div id="pallet-3d-{{ pallet.pallet_number }}" style="width: 300px; height: 300px;">
+                                    <div class="d-flex justify-content-center align-items-center h-100">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">読み込み中...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <small class="text-muted">※ {{ pallet_config.width|floatformat:0 }}cm × {{ pallet_config.depth|floatformat:0 }}cm × {{ pallet_config.max_height|floatformat:0 }}cm パレット</small>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    マウスでドラッグ：回転 | ホイール：ズーム
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            
+            <!-- バラ積み商品 -->
+            {% if palletize_plan.loose_items.exists %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">バラ積み商品（パレットに載らない商品）</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>品目コード</th>
+                                    <th>商品名</th>
+                                    <th>出荷依頼</th>
+                                    <th>サイズ (cm)</th>
+                                    <th>重量 (kg)</th>
+                                    <th>理由</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in palletize_plan.loose_items.all %}
+                                <tr>
+                                    <td>{{ item.item.item_code }}</td>
+                                    <td>{{ item.item.name }}</td>
+                                    <td>
+                                        <a href="{% url 'delivery:order_detail' item.shipping_order.id %}">
+                                            {{ item.shipping_order.order_number }}
+                                        </a>
+                                    </td>
+                                    <td>{{ item.width }} × {{ item.depth }} × {{ item.height }}</td>
+                                    <td>{{ item.weight|floatformat:1 }}</td>
+                                    <td>{{ item.reason }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- 作成情報 -->
+            <div class="mt-4 text-muted">
+                <small>作成日時: {{ palletize_plan.created_at|date:'Y年m月d日 H:i' }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// WebGLコンテキスト管理用のオブジェクト
+const webGLContextManager = {
+    activeContexts: new Map(),
+    maxContexts: 4, // 同時に表示する最大3Dビュー数
+    
+    // WebGLコンテキストを破棄
+    disposeContext: function(palletNumber) {
+        const context = this.activeContexts.get(palletNumber);
+        if (context) {
+            // アニメーションループ停止
+            if (context.animationId) {
+                cancelAnimationFrame(context.animationId);
+            }
+            
+            // Three.jsオブジェクトの破棄
+            if (context.renderer) {
+                context.renderer.dispose();
+                if (context.renderer.domElement && context.renderer.domElement.parentNode) {
+                    context.renderer.domElement.parentNode.removeChild(context.renderer.domElement);
+                }
+            }
+            
+            // マップから削除
+            this.activeContexts.delete(palletNumber);
+            
+            // 破棄後に「3D表示」ボタンを表示
+            const container = document.getElementById(`pallet-3d-${palletNumber}`);
+            if (container) {
+                container.innerHTML = `
+                    <div class="d-flex justify-content-center align-items-center h-100">
+                        <button class="btn btn-primary" onclick="createPallet3D(${palletNumber}, palletsData[${palletNumber}])">
+                            <i class="fas fa-cube"></i> 3D表示
+                        </button>
+                    </div>
+                `;
+            }
+        }
+    },
+    
+    // 古いコンテキストを破棄
+    disposeLRUContext: function() {
+        if (this.activeContexts.size >= this.maxContexts) {
+            // 最も古いエントリを削除（MapはInsert順を保持）
+            const firstKey = this.activeContexts.keys().next().value;
+            this.disposeContext(firstKey);
+        }
+    },
+    
+    // 新しいコンテキストを追加
+    addContext: function(palletNumber, context) {
+        this.disposeLRUContext();
+        this.activeContexts.set(palletNumber, context);
+    }
+};
+
+// パレット3D表示の作成関数
+function createPallet3D(palletNumber, palletData) {
+    try {
+        const container = document.getElementById(`pallet-3d-${palletNumber}`);
+        if (!container) {
+            console.error(`Container not found for pallet ${palletNumber}`);
+            return;
+        }
+        
+        // 既存のコンテキストがあれば破棄
+        webGLContextManager.disposeContext(palletNumber);
+        
+        // スピナーを削除
+        container.innerHTML = '';
+        
+        // Scene, Camera, Renderer設定
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            powerPreference: "high-performance",
+            failIfMajorPerformanceCaveat: false
+        });
+        renderer.setSize(300, 300);
+        renderer.setClearColor(0xf8f9fa);
+        container.appendChild(renderer.domElement);
+        
+        // OrbitControlsの設定
+        let controls;
+        if (typeof THREE.OrbitControls !== 'undefined') {
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+        }
+        
+        // ライト設定
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(50, 100, 50);
+        scene.add(directionalLight);
+        
+        // パレット定数
+        const palletWidth = palletData.config.width;
+        const palletDepth = palletData.config.depth;
+        const palletHeight = 3;
+        const maxStackHeight = palletData.config.maxHeight;
+        
+        // パレット（木製）を作成
+        const palletGeometry = new THREE.BoxGeometry(palletWidth, palletHeight, palletDepth);
+        const palletMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        const pallet = new THREE.Mesh(palletGeometry, palletMaterial);
+        pallet.position.set(0, 0, 0);
+        scene.add(pallet);
+        
+        // パレット枠
+        const edges = new THREE.EdgesGeometry(palletGeometry);
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0x654321, linewidth: 2 });
+        const palletEdges = new THREE.LineSegments(edges, lineMaterial);
+        palletEdges.position.set(0, 0, 0);
+        scene.add(palletEdges);
+        
+        // 商品を配置
+        const colors = [0x4a90e2, 0x50c878, 0xf5a623, 0xd0021b, 0x9013fe, 0x7ed321];
+        
+        palletData.items.forEach((item, index) => {
+            const itemWidth = item.width;
+            const itemHeight = item.height;
+            const itemDepth = item.depth;
+            
+            // 商品のボックスを作成
+            const boxGeometry = new THREE.BoxGeometry(itemWidth, itemHeight, itemDepth);
+            const boxMaterial = new THREE.MeshLambertMaterial({ 
+                color: colors[index % colors.length],
+                transparent: true,
+                opacity: 0.8
+            });
+            const box = new THREE.Mesh(boxGeometry, boxMaterial);
+            
+            // 位置を設定
+            const x = item.position.x + itemWidth / 2 - palletWidth / 2;
+            const z = item.position.y + itemDepth / 2 - palletDepth / 2;
+            const y = item.position.z + itemHeight / 2 + palletHeight / 2;
+            
+            box.position.set(x, y, z);
+            scene.add(box);
+            
+            // 商品の枠線
+            const boxEdges = new THREE.EdgesGeometry(boxGeometry);
+            const boxLineMaterial = new THREE.LineBasicMaterial({ color: 0x333333 });
+            const boxLines = new THREE.LineSegments(boxEdges, boxLineMaterial);
+            boxLines.position.copy(box.position);
+            scene.add(boxLines);
+        });
+        
+        // カメラ位置を設定
+        camera.position.set(120, 80, 120);
+        camera.lookAt(0, 30, 0);
+        
+        // アニメーションループ
+        let animationId;
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+            if (controls) {
+                controls.update();
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+        
+        // コンテキストを保存
+        webGLContextManager.addContext(palletNumber, {
+            renderer: renderer,
+            animationId: animationId,
+            scene: scene,
+            camera: camera
+        });
+        
+        console.log(`3D scene created successfully for pallet ${palletNumber}`);
+        
+    } catch (error) {
+        console.error(`Error creating 3D scene for pallet ${palletNumber}:`, error);
+        const container = document.getElementById(`pallet-3d-${palletNumber}`);
+        if (container) {
+            container.innerHTML = '<div class="alert alert-warning">3D表示でエラーが発生しました</div>';
+        }
+    }
+}
+
+// パレットデータの準備
+const palletsData = {
+    {% for pallet in palletize_plan.pallets.all %}
+    {{ pallet.pallet_number }}: {
+        config: {
+            width: {{ pallet_config.width }},
+            depth: {{ pallet_config.depth }},
+            maxHeight: {{ pallet_config.max_height }}
+        },
+        items: [
+            {% for item in pallet.items.all %}
+            {
+                width: {{ item.width }},
+                height: {{ item.height }},
+                depth: {{ item.depth }},
+                position: {
+                    x: {{ item.position_x }},
+                    y: {{ item.position_y }},
+                    z: {{ item.position_z }}
+                }
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+};
+
+// 初期表示（最初の数個のパレットのみ）
+document.addEventListener('DOMContentLoaded', function() {
+    // Three.jsが読み込まれているかチェック
+    if (typeof THREE === 'undefined') {
+        console.error('Three.js library is not loaded');
+        return;
+    }
+    
+    // 最初の4つのパレットを表示
+    let displayCount = 0;
+    {% for pallet in palletize_plan.pallets.all %}
+    if (displayCount < webGLContextManager.maxContexts) {
+        createPallet3D({{ pallet.pallet_number }}, palletsData[{{ pallet.pallet_number }}]);
+        displayCount++;
+    } else {
+        // 残りは「表示」ボタンを作成
+        const container = document.getElementById('pallet-3d-{{ pallet.pallet_number }}');
+        if (container) {
+            container.innerHTML = `
+                <div class="d-flex justify-content-center align-items-center h-100">
+                    <button class="btn btn-primary" onclick="createPallet3D({{ pallet.pallet_number }}, palletsData[{{ pallet.pallet_number }}])">
+                        <i class="fas fa-cube"></i> 3D表示
+                    </button>
+                </div>
+            `;
+        }
+    }
+    {% endfor %}
+});
+
+// ページ離脱時にすべてのWebGLコンテキストを破棄
+window.addEventListener('beforeunload', function() {
+    webGLContextManager.activeContexts.forEach((context, palletNumber) => {
+        webGLContextManager.disposeContext(palletNumber);
+    });
+});
+
+// トグルボタンのアイコン変更と概要表示切り替え
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleButtons = document.querySelectorAll('[data-bs-toggle="collapse"]');
+    toggleButtons.forEach(button => {
+        const targetId = button.getAttribute('data-bs-target');
+        const targetElement = document.querySelector(targetId);
+        
+        if (targetElement) {
+            // パレット番号を取得
+            const palletNumber = targetId.split('-').pop();
+            const summaryElement = document.querySelector(`#pallet-summary-${palletNumber}`);
+            
+            targetElement.addEventListener('show.bs.collapse', function() {
+                // 詳細表示時：アイコン変更 + 概要非表示
+                const icon = button.querySelector('i');
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+                button.innerHTML = '<i class="fas fa-chevron-up"></i> 詳細非表示';
+                
+                if (summaryElement) {
+                    summaryElement.classList.remove('show');
+                }
+            });
+            
+            targetElement.addEventListener('hide.bs.collapse', function() {
+                // 詳細非表示時：アイコン変更 + 概要表示
+                const icon = button.querySelector('i');
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+                button.innerHTML = '<i class="fas fa-chevron-down"></i> 詳細表示';
+                
+                if (summaryElement) {
+                    summaryElement.classList.add('show');
+                }
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

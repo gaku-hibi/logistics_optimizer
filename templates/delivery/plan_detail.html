@@ -28,6 +28,9 @@
                     <a href="{% url 'delivery:plan_report' plan.id %}" class="btn btn-outline-secondary btn-sm">
                         <i class="fas fa-file-pdf"></i> PDFダウンロード
                     </a>
+                    <a href="{% url 'delivery:plan_delete' plan.id %}" class="btn btn-outline-danger btn-sm">
+                        <i class="fas fa-trash"></i> 削除
+                    </a>
                 </div>
             </div>
             <div class="card-body">
@@ -138,6 +141,148 @@
             </div>
         </div>
 
+        <!-- 積載パレット概要 -->
+        {% if pallet_summary %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-pallet text-brown"></i>
+                    積載パレット概要
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for pallet in pallet_summary %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title text-primary">
+                                    <i class="fas fa-pallet"></i> パレット #{{ pallet.pallet_number }}
+                                    <small class="text-muted">{{ pallet.position }}</small>
+                                </h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <small class="text-muted">商品数:</small><br>
+                                        <strong>{{ pallet.item_count }}個</strong>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">総重量:</small><br>
+                                        <strong>{{ pallet.total_weight|floatformat:1 }}kg</strong>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-12">
+                                        <small class="text-muted">総容量:</small><br>
+                                        <strong>{{ pallet.total_volume|floatformat:0 }}cm³</strong>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <button class="btn btn-sm btn-outline-primary" type="button" 
+                                            data-bs-toggle="collapse" 
+                                            data-bs-target="#pallet-items-{{ pallet.pallet_number }}" 
+                                            aria-expanded="false">
+                                        <i class="fas fa-eye"></i> 詳細表示
+                                    </button>
+                                </div>
+                                <div class="collapse mt-3" id="pallet-items-{{ pallet.pallet_number }}">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>商品名</th>
+                                                    <th>寸法</th>
+                                                    <th>重量</th>
+                                                    <th>位置</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in pallet.items %}
+                                                <tr>
+                                                    <td>{{ item.item.name }}</td>
+                                                    <td>{{ item.item.width|default:50 }}×{{ item.item.depth|default:50 }}×{{ item.item.height|default:50 }}</td>
+                                                    <td>{{ item.item.weight|default:0|floatformat:1 }}kg</td>
+                                                    <td>({{ item.position_x }}, {{ item.position_y }})</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- パレタイズされていない商品 -->
+        {% if loose_items_summary %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cube text-info"></i>
+                    パレタイズされていない商品（バラ積み）
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>注意:</strong> 以下の商品は標準パレットサイズ(110cm×110cm)に収まらないため、トラックに直接積載されます。
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>商品名</th>
+                                <th>寸法(cm)</th>
+                                <th>重量(kg)</th>
+                                <th>容量(cm³)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for loose_item in loose_items_summary %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'delivery:item_detail' loose_item.item.pk %}">
+                                        {{ loose_item.item.name }}
+                                    </a>
+                                </td>
+                                <td>{{ loose_item.width }}×{{ loose_item.depth }}×{{ loose_item.height }}</td>
+                                <td>{{ loose_item.weight|floatformat:1 }}</td>
+                                <td>{{ loose_item.volume|floatformat:0 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h6 class="text-primary">{{ loose_items_summary|length }}</h6>
+                                <small class="text-muted">バラ積み商品数</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h6 class="text-success">{{ total_loose_weight|floatformat:1 }}</h6>
+                                <small class="text-muted">総重量(kg)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h6 class="text-info">{{ total_loose_volume|floatformat:0 }}</h6>
+                                <small class="text-muted">総容量(cm³)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- 積載商品 -->
         <div class="card mt-4">
             <div class="card-header">
@@ -198,6 +343,9 @@
                     <a href="{% url 'delivery:plan_list' %}" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left"></i> 一覧に戻る
                     </a>
+                    <a href="{% url 'delivery:plan_delete' plan.pk %}" class="btn btn-outline-danger">
+                        <i class="fas fa-trash"></i> 削除
+                    </a>
                 </div>
             </div>
         </div>
@@ -214,9 +362,33 @@
                 <div id="truck-layout" class="border" style="width: 100%; height: 300px; position: relative; background: #f8f9fa;">
                     <!-- JavaScript で描画 -->
                 </div>
-                <small class="text-muted mt-2 d-block text-center">
-                    荷台サイズ: {{ plan.truck.width }}×{{ plan.truck.depth }}cm
-                </small>
+                <div class="mt-3">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <small class="text-muted">
+                                <i class="fas fa-truck"></i> 荷台サイズ: {{ plan.truck.width }}×{{ plan.truck.depth }}cm
+                            </small>
+                        </div>
+                        {% if palletize_plan %}
+                        <div class="col-md-4">
+                            <small class="text-muted">
+                                <i class="fas fa-boxes" style="color: #8B4513;"></i> パレット: {{ palletize_plan.total_pallets }}基
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            <small class="text-muted">
+                                <i class="fas fa-cube" style="color: #17a2b8;"></i> バラ積み: {{ palletize_plan.total_loose_items }}個
+                            </small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <span style="background: #8B4513; padding: 2px 6px; color: white; border-radius: 3px; margin-right: 10px;">■</span>パレット
+                            <span style="background: #17a2b8; padding: 2px 6px; color: white; border-radius: 3px; margin-left: 10px;">■</span>バラ積み商品
+                        </small>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -289,28 +461,113 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         container.appendChild(truck);
         
-        // 商品の描画
-        truckLayout.items.forEach((item, index) => {
-            const itemDiv = document.createElement('div');
-            itemDiv.style.cssText = `
-                position: absolute;
-                left: ${item.x * scale}px;
-                top: ${item.y * scale}px;
-                width: ${item.width * scale}px;
-                height: ${item.depth * scale}px;
-                background: hsl(${(index * 40) % 360}, 70%, 80%);
-                border: 1px solid #333;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 8px;
-                font-weight: bold;
-                transform: rotate(${item.rotation}deg);
-            `;
-            itemDiv.textContent = item.name.substring(0, 6) + (item.quantity > 1 ? ` x${item.quantity}` : '');
-            itemDiv.title = `${item.name} x${item.quantity}`;
-            truck.appendChild(itemDiv);
-        });
+        // パレットの描画
+        if (truckLayout.pallets) {
+            console.log('パレット配置情報:', truckLayout.pallets);
+            console.log('スケール:', scale);
+            console.log('トラックサイズ:', truckLayout.width, 'x', truckLayout.depth);
+            
+            // パレットの重複チェック
+            const palletPositions = new Map();
+            truckLayout.pallets.forEach((pallet, index) => {
+                const key = `${pallet.x},${pallet.y}`;
+                if (palletPositions.has(key)) {
+                    console.warn(`パレット重複検出: 位置(${pallet.x}, ${pallet.y}) - パレット#${palletPositions.get(key)} と パレット#${pallet.pallet_number || (index + 1)}`);
+                } else {
+                    palletPositions.set(key, pallet.pallet_number || (index + 1));
+                }
+            });
+            
+            truckLayout.pallets.forEach((pallet, palletIndex) => {
+                console.log(`パレット #${pallet.pallet_number || (palletIndex + 1)}:`, 
+                    `位置(${pallet.x}, ${pallet.y})`, 
+                    `サイズ${pallet.width}x${pallet.depth}`,
+                    `描画位置(${pallet.x * scale}, ${pallet.y * scale})`,
+                    `描画サイズ${pallet.width * scale}x${pallet.depth * scale}`);
+                
+                // パレットごとに異なる色を設定
+                const palletColors = [
+                    'rgba(139, 69, 19, 0.8)',   // Brown
+                    'rgba(65, 105, 225, 0.8)',  // Royal Blue
+                    'rgba(220, 20, 60, 0.8)',   // Crimson
+                    'rgba(34, 139, 34, 0.8)',   // Forest Green
+                    'rgba(255, 140, 0, 0.8)',   // Dark Orange
+                    'rgba(128, 0, 128, 0.8)',   // Purple
+                ];
+                const palletColor = palletColors[palletIndex % palletColors.length];
+                
+                const palletDiv = document.createElement('div');
+                palletDiv.style.cssText = `
+                    position: absolute;
+                    left: ${pallet.x * scale}px;
+                    top: ${pallet.y * scale}px;
+                    width: ${pallet.width * scale}px;
+                    height: ${pallet.depth * scale}px;
+                    background: ${palletColor};
+                    border: 3px solid #333;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 10px;
+                    font-weight: bold;
+                    color: white;
+                    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+                    z-index: ${10 + palletIndex};
+                    box-sizing: border-box;
+                `;
+                const palletNumber = pallet.pallet_number || (palletIndex + 1);
+                palletDiv.textContent = `パレット #${palletNumber}`;
+                palletDiv.title = `パレット #${palletNumber} (${pallet.items.length}商品) - 位置(${pallet.x}, ${pallet.y})`;
+                truck.appendChild(palletDiv);
+                
+                // パレット内の商品を薄く表示
+                pallet.items.forEach((item, itemIndex) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.style.cssText = `
+                        position: absolute;
+                        left: ${(pallet.x + item.x) * scale}px;
+                        top: ${(pallet.y + item.y) * scale}px;
+                        width: ${item.width * scale}px;
+                        height: ${item.depth * scale}px;
+                        background: rgba(255, 255, 255, 0.3);
+                        border: 1px solid rgba(255, 255, 255, 0.5);
+                        font-size: 6px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        pointer-events: none;
+                    `;
+                    itemDiv.textContent = item.name.substring(0, 4);
+                    truck.appendChild(itemDiv);
+                });
+            });
+        }
+        
+        // バラ積み商品の描画
+        if (truckLayout.loose_items) {
+            truckLayout.loose_items.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.style.cssText = `
+                    position: absolute;
+                    left: ${item.x * scale}px;
+                    top: ${item.y * scale}px;
+                    width: ${item.width * scale}px;
+                    height: ${item.depth * scale}px;
+                    background: hsl(${(index * 40 + 180) % 360}, 70%, 80%);
+                    border: 1px solid #333;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 8px;
+                    font-weight: bold;
+                    transform: rotate(${item.rotation || 0}deg);
+                `;
+                itemDiv.textContent = item.name.substring(0, 6) + (item.quantity > 1 ? ` x${item.quantity}` : '');
+                itemDiv.title = `${item.name} x${item.quantity} (バラ積み)`;
+                truck.appendChild(itemDiv);
+            });
+        }
     }
 });
 </script>

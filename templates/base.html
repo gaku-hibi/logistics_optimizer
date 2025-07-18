@@ -43,11 +43,21 @@
                     
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-boxes"></i> パレタイズ
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'delivery:palletize_list' %}">パレタイズ設計一覧</a></li>
+                            <li><a class="dropdown-item" href="{% url 'delivery:palletize_design' %}">パレタイズ設計</a></li>
+                        </ul>
+                    </li>
+                    
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-route"></i> 配送計画
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{% url 'delivery:plan_list' %}">配送計画一覧</a></li>
-                            <li><a class="dropdown-item" href="{% url 'delivery:optimize_delivery' %}">最適化実行</a></li>
+                            <li><a class="dropdown-item" href="{% url 'delivery:optimize_delivery' %}">配送計画作成</a></li>
                         </ul>
                     </li>
                     
@@ -60,6 +70,8 @@
                             <li><a class="dropdown-item" href="{% url 'delivery:truck_list' %}">トラック一覧</a></li>
                             <li><a class="dropdown-item" href="{% url 'delivery:shipper_list' %}">荷主一覧</a></li>
                             <li><a class="dropdown-item" href="{% url 'delivery:destination_list' %}">配送先一覧</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/admin/delivery/palletconfiguration/">パレット設定</a></li>
                         </ul>
                     </li>
                     
@@ -96,6 +108,10 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
     {% block extra_js %}{% endblock %}
 </body>

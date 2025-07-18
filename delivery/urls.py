@@ -16,6 +16,8 @@ urlpatterns = [
     # 配送計画
     path('plans/', views.plan_list, name='plan_list'),
     path('plans/<int:pk>/', views.plan_detail, name='plan_detail'),
+    path('plans/<int:pk>/delete/', views.plan_delete, name='plan_delete'),
+    path('plans/delete-all/', views.plan_delete_all, name='plan_delete_all'),
     path('plans/optimize/', views.optimize_delivery, name='optimize_delivery'),
     
     # トラック
@@ -49,4 +51,12 @@ urlpatterns = [
     
     # データインポート
     path('import/', views.data_import, name='data_import'),
+    
+    # パレタイズ設計
+    path('palletize/', views.palletize_design, name='palletize_design'),
+    path('palletize/list/', views.palletize_list, name='palletize_list'),
+    path('palletize/<int:pk>/', views.palletize_detail, name='palletize_detail'),
+    path('palletize/<int:pk>/delete/', views.palletize_delete, name='palletize_delete'),
+    path('palletize/delete-all/', views.palletize_delete_all, name='palletize_delete_all'),
+    path('palletize/result/<str:delivery_date>/', views.palletize_result, name='palletize_result'),
 ]

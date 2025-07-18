@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}パレタイズ設計削除確認{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> パレタイズ設計削除確認
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-warning"></i>
+                        <strong>注意:</strong> この操作は取り消すことができません。
+                    </div>
+                    
+                    <p class="mb-4">以下のパレタイズ設計を削除しますか？</p>
+                    
+                    <!-- パレタイズ設計情報 -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">パレタイズ設計詳細</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>設計ID:</strong> {{ palletize_plan.id }}</p>
+                                    <p><strong>配送日:</strong> {{ palletize_plan.delivery_date|date:'Y年m月d日' }}</p>
+                                    <p><strong>総商品数:</strong> {{ palletize_plan.total_items }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>パレット数:</strong> {{ palletize_plan.total_pallets }}</p>
+                                    <p><strong>バラ積み数:</strong> {{ palletize_plan.total_loose_items }}</p>
+                                    <p><strong>作成日時:</strong> {{ palletize_plan.created_at|date:'Y年m月d日 H:i' }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 関連データ情報 -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">削除される関連データ</h5>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    パレット詳細
+                                    <span class="badge bg-secondary">{{ pallets_count }}件</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    パレット積載商品
+                                    <span class="badge bg-secondary">{{ pallet_items_count }}件</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    バラ積み商品
+                                    <span class="badge bg-secondary">{{ loose_items_count }}件</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    関連出荷依頼
+                                    <span class="badge bg-info">{{ related_orders_count }}件</span>
+                                </li>
+                            </ul>
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    <i class="bi bi-info-circle"></i>
+                                    出荷依頼、商品、荷主、配送先などのマスタデータは削除されません。
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 影響範囲の警告 -->
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>影響範囲:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>この設計日の配送計画最適化で、パレタイズ設計結果が参照されなくなります</li>
+                            <li>配送計画の最適化時に、新しいパレタイズ設計が自動作成されます</li>
+                            <li>既存の配送計画には影響しません</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- 操作ボタン -->
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'delivery:palletize_detail' palletize_plan.id %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> キャンセル
+                        </a>
+                        <form method="post" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('本当に削除しますか？')">
+                                <i class="bi bi-trash"></i> 削除する
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

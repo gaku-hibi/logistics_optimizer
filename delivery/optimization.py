@@ -13,7 +13,9 @@ from django.db import transaction
 
 from .models import (
     ShippingOrder, OrderItem, Truck, DeliveryPlan, 
-    PlanOrderDetail, PlanItemLoad, Item
+    PlanOrderDetail, PlanItemLoad, Item, PalletConfiguration,
+    UnifiedPallet, LoadPallet, PalletLoadHistory,
+    PalletizePlan, PalletDetail, PalletItem, LooseItem
 )
 
 
@@ -29,21 +31,32 @@ class Box:
     x: int = 0  # パレット内での位置
     y: int = 0
     z: int = 0  # 高さ方向の位置
+    shipping_order_id: int = None  # 出荷依頼ID
 
 
 @dataclass
 class Pallet:
     """パレットを表すクラス"""
-    width: int = 110  # 標準パレット 1.1m
-    depth: int = 110
-    height: int = 150  # 積み上げ高さ1.5m
-    max_weight: float = 1000
+    width: int = 100  # パレット幅
+    depth: int = 100  # パレット奥行
+    height: int = 80   # 積み上げ高さ
+    max_weight: float = 100  # 最大重量
     boxes: List[Box] = None
     current_height: int = 0  # 現在の積み上げ高さ
     
     def __post_init__(self):
         if self.boxes is None:
             self.boxes = []
+    
+    @classmethod
+    def from_config(cls, config: 'PalletConfiguration'):
+        """設定からパレットを作成"""
+        return cls(
+            width=config.width,
+            depth=config.depth,
+            height=config.max_height,
+            max_weight=config.max_weight
+        )
     
     def get_total_weight(self) -> float:
         """パレット上の総重量を取得"""
@@ -67,11 +80,19 @@ class Position:
 class PalletOptimizer:
     """パレタイズ最適化クラス（3D配置対応）"""
     
-    def __init__(self):
-        self.pallet_width = 110  # cm
-        self.pallet_depth = 110  # cm
-        self.max_height = 150    # cm
-        self.max_weight = 1000   # kg
+    def __init__(self, pallet_config=None):
+        """
+        Args:
+            pallet_config: PalletConfiguration インスタンス。Noneの場合はデフォルト設定を使用
+        """
+        if pallet_config is None:
+            pallet_config = PalletConfiguration.get_default()
+        
+        self.pallet_width = pallet_config.width     # cm
+        self.pallet_depth = pallet_config.depth     # cm
+        self.max_height = pallet_config.max_height  # cm
+        self.max_weight = pallet_config.max_weight  # kg
+        self.config = pallet_config
     
     def can_palletize(self, box: Box) -> bool:
         """商品がパレタイズ可能かチェック"""
@@ -81,39 +102,57 @@ class PalletOptimizer:
         return (fits_normal or fits_rotated) and box.height <= self.max_height
     
     def pack_pallet(self, boxes: List[Box]) -> Tuple[List[Pallet], List[Box]]:
-        """箱をパレットに詰める（3D First Fit Decreasing）"""
+        """箱をパレットに詰める（3D First Fit Decreasing + 出荷依頼別分離）"""
         pallets = []
         remaining_boxes = []
         
-        # 体積順でソート（大きい順）- より効率的なパッキングのため
-        sorted_boxes = sorted(boxes, key=lambda b: b.width * b.depth * b.height, reverse=True)
+        # 出荷依頼別にグループ化
+        order_groups = {}
+        for box in boxes:
+            order_id = box.shipping_order_id
+            if order_id not in order_groups:
+                order_groups[order_id] = []
+            order_groups[order_id].append(box)
         
-        for box in sorted_boxes:
-            if not self.can_palletize(box):
-                remaining_boxes.append(box)
-                continue
-            
-            placed = False
-            
-            # 既存パレットに配置可能かチェック
-            for pallet in pallets:
-                position = self._find_position_on_pallet(pallet, box)
-                if position:
-                    box.x, box.y, box.z = position
-                    pallet.boxes.append(box)
-                    # パレットの現在の高さを更新
-                    pallet.current_height = max(pallet.current_height, box.z + box.height)
-                    placed = True
-                    break
-            
-            # 新しいパレットが必要
-            if not placed:
-                new_pallet = Pallet()
-                box.x, box.y, box.z = 0, 0, 0
-                new_pallet.boxes.append(box)
-                new_pallet.current_height = box.height
-                pallets.append(new_pallet)
+        print(f"出荷依頼別グループ数: {len(order_groups)}")
         
+        # 各出荷依頼グループを個別にパレタイズ
+        for order_id, order_boxes in order_groups.items():
+            print(f"出荷依頼ID {order_id}: {len(order_boxes)}個の商品をパレタイズ")
+            
+            # 体積順でソート（大きい順）- より効率的なパッキングのため
+            sorted_boxes = sorted(order_boxes, key=lambda b: b.width * b.depth * b.height, reverse=True)
+            
+            for box in sorted_boxes:
+                if not self.can_palletize(box):
+                    remaining_boxes.append(box)
+                    continue
+                
+                placed = False
+                
+                # 既存パレットに配置可能かチェック（同じ出荷依頼のパレットのみ）
+                for pallet in pallets:
+                    # パレットが同じ出荷依頼の商品のみを含むかチェック
+                    if pallet.boxes and pallet.boxes[0].shipping_order_id == order_id:
+                        position = self._find_position_on_pallet(pallet, box)
+                        if position:
+                            box.x, box.y, box.z = position
+                            pallet.boxes.append(box)
+                            # パレットの現在の高さを更新
+                            pallet.current_height = max(pallet.current_height, box.z + box.height)
+                            placed = True
+                            break
+                
+                # 新しいパレットが必要
+                if not placed:
+                    new_pallet = Pallet.from_config(self.config)
+                    box.x, box.y, box.z = 0, 0, 0
+                    new_pallet.boxes.append(box)
+                    new_pallet.current_height = box.height
+                    pallets.append(new_pallet)
+                    print(f"出荷依頼ID {order_id} 用の新しいパレット #{len(pallets)} を作成")
+        
+        print(f"総パレット数: {len(pallets)}")
         return pallets, remaining_boxes
     
     def _find_position_on_pallet(self, pallet: Pallet, box: Box) -> Optional[Tuple[int, int, int]]:
@@ -234,6 +273,10 @@ class BinPacking2D:
         ]
         
         for width, depth, rotation in orientations:
+            # トラックのサイズを超えないかチェック
+            if width > self.truck_width or depth > self.truck_depth:
+                continue
+                
             for y in range(0, self.truck_depth - depth + 1, 10):  # 10cm刻み
                 for x in range(0, self.truck_width - width + 1, 10):
                     if self._can_place_at(x, y, width, depth):
@@ -336,33 +379,168 @@ class DeliveryOptimizer:
         self.pallet_optimizer = PalletOptimizer()
         self.route_optimizer = RouteOptimizer()
     
+    def optimize_with_unified_pallets(self, orders: List[ShippingOrder], target_date) -> List[DeliveryPlan]:
+        """統一パレットシステムを使用した配送最適化"""
+        plans = []
+        
+        print(f"=== 統一パレット最適化開始 ===")
+        print(f"注文数: {len(orders)}")
+        
+        try:
+            with transaction.atomic():
+                # 1. 利用可能なUnifiedPalletを取得
+                print("1. UnifiedPallet取得開始")
+                available_pallets = self._get_available_unified_pallets(orders, target_date)
+                print(f"取得されたパレット数: {len(available_pallets)}")
+                
+                if not available_pallets:
+                    print("利用可能なパレットがありません。処理を終了します。")
+                    return plans
+                
+                # 2. 注文を地域別にグループ化
+                grouped_orders = self._group_orders_by_region(orders)
+                
+                # 3. 各地域に対してパレットを割り当て
+                print(f"地域数: {len(grouped_orders)}")
+                for region, region_orders in grouped_orders.items():
+                    print(f"=== 地域 {region} の処理開始 (注文数: {len(region_orders)}) ===")
+                    
+                    region_pallets = self._allocate_pallets_for_region(
+                        region_orders, available_pallets
+                    )
+                    
+                    if not region_pallets:
+                        print(f"警告: 地域 {region} に割り当てるパレットがありません")
+                        continue
+                    
+                    # 使用したパレットを削除
+                    for pallet in region_pallets:
+                        if pallet in available_pallets:
+                            available_pallets.remove(pallet)
+                    
+                    # 4. トラックに積載
+                    truck_plans = self._pack_trucks_with_unified_pallets(
+                        region_pallets, region_orders, target_date
+                    )
+                    
+                    if truck_plans:
+                        print(f"地域 {region} で {len(truck_plans)} の配送計画を作成")
+                        plans.extend(truck_plans)
+                    else:
+                        print(f"警告: 地域 {region} でトラック積載に失敗")
+                
+        except Exception as e:
+            print(f"統一パレット最適化エラー: {e}")
+            import traceback
+            traceback.print_exc()
+            raise Exception(f"統一パレット最適化処理中にエラーが発生しました: {e}")
+        
+        return plans
+    
     def optimize(self, orders: List[ShippingOrder], target_date) -> List[DeliveryPlan]:
         """配送最適化を実行"""
         plans = []
         
         try:
             with transaction.atomic():
-                # 1. 注文を地域別にグループ化
+                # 1. 全体のパレタイズ設計結果を一度だけ取得
+                all_pallets, all_loose_items = self._get_or_create_palletize_result(orders, target_date)
+                
+                # 2. 注文を地域別にグループ化
                 grouped_orders = self._group_orders_by_region(orders)
                 
+                # 3. 各地域に対して必要なパレットとバラ積み商品を割り当て
+                remaining_pallets = all_pallets.copy()
+                remaining_loose_items = all_loose_items.copy()
+                
                 for region, region_orders in grouped_orders.items():
-                    # 2. 商品をパレタイズ
-                    pallets, loose_items = self._palletize_orders(region_orders)
+                    # 地域の注文に必要なパレットとバラ積み商品を特定
+                    region_pallets, region_loose_items = self._allocate_items_for_region(
+                        region_orders, remaining_pallets, remaining_loose_items
+                    )
                     
-                    # 3. トラックに積載
-                    truck_plans = self._pack_trucks(pallets, loose_items, region_orders, target_date)
+                    # 使用したパレットとバラ積み商品を削除
+                    for pallet in region_pallets:
+                        if pallet in remaining_pallets:
+                            remaining_pallets.remove(pallet)
+                    
+                    for item in region_loose_items:
+                        if item in remaining_loose_items:
+                            remaining_loose_items.remove(item)
+                    
+                    # 4. トラックに積載
+                    truck_plans = self._pack_trucks(region_pallets, region_loose_items, region_orders, target_date)
                     
                     plans.extend(truck_plans)
                 
         except Exception as e:
             print(f"最適化エラー: {e}")
-            return []
+            import traceback
+            traceback.print_exc()
+            
+            # エラーの詳細を分析
+            error_type = type(e).__name__
+            error_msg = str(e)
+            
+            if "PalletConfiguration" in error_msg:
+                raise Exception(f"パレット設定エラー: {error_msg}")
+            elif "Truck" in error_msg:
+                raise Exception(f"トラック情報エラー: {error_msg}")
+            elif "Item" in error_msg:
+                raise Exception(f"商品情報エラー: {error_msg}")
+            elif "database" in error_msg.lower():
+                raise Exception(f"データベースエラー: {error_msg}")
+            else:
+                raise Exception(f"最適化処理中にエラーが発生しました ({error_type}): {error_msg}")
         
         return plans
+    
+    def _allocate_items_for_region(self, region_orders: List[ShippingOrder], 
+                                  available_pallets: List[Pallet], 
+                                  available_loose_items: List[Box]) -> Tuple[List[Pallet], List[Box]]:
+        """地域の注文に必要なパレットとバラ積み商品を割り当て"""
+        region_pallets = []
+        region_loose_items = []
+        
+        # 地域の注文から必要な商品を特定
+        needed_items = {}
+        for order in region_orders:
+            for order_item in order.order_items.all():
+                item_code = order_item.item.item_code
+                if item_code not in needed_items:
+                    needed_items[item_code] = 0
+                needed_items[item_code] += order_item.quantity
+        
+        print(f"地域の必要商品: {needed_items}")
+        
+        # パレットから必要な商品を含むものを選択
+        for pallet in available_pallets:
+            pallet_has_needed_items = False
+            for box in pallet.boxes:
+                if box.item_code in needed_items and needed_items[box.item_code] > 0:
+                    pallet_has_needed_items = True
+                    needed_items[box.item_code] -= box.quantity
+                    break
+            
+            if pallet_has_needed_items:
+                region_pallets.append(pallet)
+        
+        # バラ積み商品から必要なものを選択
+        for loose_item in available_loose_items:
+            if loose_item.item_code in needed_items and needed_items[loose_item.item_code] > 0:
+                region_loose_items.append(loose_item)
+                needed_items[loose_item.item_code] -= loose_item.quantity
+        
+        print(f"地域に割り当てたパレット数: {len(region_pallets)}")
+        print(f"地域に割り当てたバラ積み商品数: {len(region_loose_items)}")
+        
+        return region_pallets, region_loose_items
     
     def _group_orders_by_region(self, orders: List[ShippingOrder]) -> Dict[str, List[ShippingOrder]]:
         """注文を地域別にグループ化"""
         groups = {}
+        
+        print(f"=== 地域グループ化開始 (注文数: {len(orders)}) ===")
         
         for order in orders:
             # 住所から市区町村を抽出（簡易版）
@@ -372,6 +550,12 @@ class DeliveryOptimizer:
             if region not in groups:
                 groups[region] = []
             groups[region].append(order)
+            
+            print(f"注文ID {order.id}: {address} -> {region}")
+        
+        # 地域別集計を表示
+        for region, region_orders in groups.items():
+            print(f"地域 {region}: {len(region_orders)}件")
         
         return groups
     
@@ -392,6 +576,89 @@ class DeliveryOptimizer:
         else:
             return 'その他'
     
+    def _get_or_create_palletize_result(self, orders: List[ShippingOrder], target_date) -> Tuple[List[Pallet], List[Box]]:
+        """既存のパレタイズ設計結果を取得、なければ新規作成"""
+        from .models import PalletizePlan, PalletDetail, PalletItem, LooseItem
+        
+        # 既存のパレタイズ設計結果を検索（最新のものを取得）
+        try:
+            palletize_plan = PalletizePlan.objects.filter(delivery_date=target_date).order_by('-created_at').first()
+            if not palletize_plan:
+                raise PalletizePlan.DoesNotExist()
+            
+            # 既存結果からパレットとバラ積み商品を復元
+            pallets = []
+            loose_items = []
+            
+            # パレットを復元
+            for pallet_detail in palletize_plan.pallets.all():
+                pallet = Pallet()
+                pallet.current_height = 0
+                
+                # パレット内の商品を復元
+                for pallet_item in pallet_detail.items.all():
+                    # 出荷依頼IDを特定するために、商品から関連する注文を検索
+                    shipping_order_id = None
+                    item_code = pallet_item.part.parts_code if pallet_item.part else pallet_item.item.item_code
+                    
+                    # 提供された注文リストから対応する出荷依頼を検索
+                    for order in orders:
+                        for order_item in order.order_items.all():
+                            if order_item.item.item_code == item_code:
+                                shipping_order_id = order.id
+                                break
+                        if shipping_order_id:
+                            break
+                    
+                    box = Box(
+                        width=pallet_item.width,
+                        depth=pallet_item.depth,
+                        height=pallet_item.height,
+                        weight=pallet_item.weight,
+                        item_code=item_code,
+                        quantity=1,
+                        shipping_order_id=shipping_order_id
+                    )
+                    box.x = pallet_item.position_x
+                    box.y = pallet_item.position_y
+                    box.z = pallet_item.position_z
+                    pallet.boxes.append(box)
+                    pallet.current_height = max(pallet.current_height, box.z + box.height)
+                
+                pallets.append(pallet)
+            
+            # バラ積み商品を復元
+            for loose_item in palletize_plan.loose_items.all():
+                # 出荷依頼IDを特定するために、商品から関連する注文を検索
+                shipping_order_id = None
+                item_code = loose_item.item.item_code
+                
+                # 提供された注文リストから対応する出荷依頼を検索
+                for order in orders:
+                    for order_item in order.order_items.all():
+                        if order_item.item.item_code == item_code:
+                            shipping_order_id = order.id
+                            break
+                    if shipping_order_id:
+                        break
+                
+                box = Box(
+                    width=loose_item.width,
+                    depth=loose_item.depth,
+                    height=loose_item.height,
+                    weight=loose_item.weight,
+                    item_code=item_code,
+                    quantity=1,
+                    shipping_order_id=shipping_order_id
+                )
+                loose_items.append(box)
+            
+            return pallets, loose_items
+            
+        except PalletizePlan.DoesNotExist:
+            # 既存の設計結果がない場合は新規作成
+            return self._palletize_orders(orders)
+    
     def _palletize_orders(self, orders: List[ShippingOrder]) -> Tuple[List[Pallet], List[Box]]:
         """注文商品をパレタイズ"""
         all_boxes = []
@@ -409,78 +676,162 @@ class DeliveryOptimizer:
                             height=item.height,
                             weight=item.weight,
                             item_code=item.item_code,
-                            quantity=1  # 各箱は個別に扱う
+                            quantity=1,  # 各箱は個別に扱う
+                            shipping_order_id=order.id  # 出荷依頼IDを設定
                         )
                         all_boxes.append(box)
+                else:
+                    print(f"警告: 商品 {item.name} ({item.item_code}) に寸法または重量が設定されていません")
         
         return self.pallet_optimizer.pack_pallet(all_boxes)
     
     def _pack_trucks(self, pallets: List[Pallet], loose_items: List[Box], 
                     orders: List[ShippingOrder], target_date) -> List[DeliveryPlan]:
-        """トラックに積載して配送計画を作成（2D配置のみ、段積み禁止）"""
+        """トラックに積載して配送計画を作成（パレット単位＋バラ積み）"""
         plans = []
-        trucks = Truck.objects.filter(width__gt=0, depth__gt=0).order_by('-payload')
+        trucks = list(Truck.objects.filter(width__gt=0, depth__gt=0).order_by('-payload'))
         
         if not trucks:
+            print("警告: 使用可能なトラックがありません")
             return plans
         
-        # 全アイテムを収集（パレットとバラ積み商品）
-        all_items = []
+        # パレットとバラ積み商品を分けて管理
+        remaining_pallets = pallets.copy()
+        remaining_loose_items = loose_items.copy()
         
-        # パレットを箱として扱う（3Dパレット内は段積み済み）
-        for pallet in pallets:
-            pallet_box = Box(
-                width=pallet.width,
-                depth=pallet.depth,
-                height=pallet.current_height,  # 実際の積み上げ高さを使用
-                weight=pallet.get_total_weight(),
-                item_code='PALLET',
-                quantity=1
-            )
-            all_items.append(pallet_box)
-        
-        # バラ積み商品を追加
-        all_items.extend(loose_items)
-        
-        # トラックに2D配置で詰込み（段積み禁止）
-        remaining_items = all_items.copy()
-        
-        for truck in trucks:
-            if not remaining_items:
-                break
+        # すべての商品が積載されるまで繰り返し
+        while remaining_pallets or remaining_loose_items:
+            truck_found = False
             
-            # 重量制限チェック
-            truck_capacity = truck.payload
-            current_weight = 0
-            truck_items = []
-            
-            # 重量制限内でアイテムを選択
-            for item in remaining_items.copy():
-                if current_weight + (item.weight * item.quantity) <= truck_capacity:
-                    truck_items.append(item)
-                    current_weight += item.weight * item.quantity
-                    remaining_items.remove(item)
-            
-            if truck_items:
-                # 2D配置でパッキング
-                packer = BinPacking2D(truck.width, truck.depth)
-                positions = packer.pack(truck_items)
+            # 各トラックタイプを試す
+            for truck in trucks:
+                if not remaining_pallets and not remaining_loose_items:
+                    break
                 
-                if positions:
-                    plan = self._create_delivery_plan(
-                        truck, orders, target_date, truck_items, positions
-                    )
-                    plans.append(plan)
+                # トラックに積載するアイテムを選択
+                truck_pallets = []
+                truck_loose_items = []
+                current_weight = 0
+                truck_capacity = truck.payload
+                
+                # 2D配置でパッキング可能な商品を選択
+                packer = BinPacking2D(truck.width, truck.depth)
+                test_items = []
+                test_pallets = []
+                test_loose = []
+                
+                # 1. パレットを優先的に積載（サイズと重量をチェック）
+                for pallet in remaining_pallets:
+                    pallet_weight = pallet.get_total_weight()
+                    # パレットがトラックに入るかサイズをチェック
+                    if (pallet.width <= truck.width and pallet.depth <= truck.depth and 
+                        current_weight + pallet_weight <= truck_capacity):
+                        pallet_box = Box(
+                            width=pallet.width,
+                            depth=pallet.depth,
+                            height=pallet.current_height,
+                            weight=pallet_weight,
+                            item_code='PALLET',
+                            quantity=1
+                        )
+                        test_items.append(pallet_box)
+                        test_pallets.append(pallet)
+                        current_weight += pallet_weight
+                
+                # 2. 残り重量でバラ積み商品を積載
+                for loose_item in remaining_loose_items:
+                    if current_weight + loose_item.weight <= truck_capacity:
+                        test_items.append(loose_item)
+                        test_loose.append(loose_item)
+                        current_weight += loose_item.weight
+                
+                # 3. 積載するアイテムがある場合、配送計画を作成
+                if test_items:
+                    # 2D配置を試行
+                    positions = packer.pack(test_items)
                     
-                    # 配置されなかったアイテムを戻す
-                    placed_items = [item for item, _ in packer.placed_items]
-                    not_placed = [item for item in truck_items if item not in placed_items]
-                    remaining_items.extend(not_placed)
+                    if positions:
+                        # 実際に積載されたアイテムを特定
+                        loaded_pallets = []
+                        loaded_loose = []
+                        
+                        for i, pos in enumerate(positions):
+                            if pos:
+                                if i < len(test_pallets):
+                                    loaded_pallets.append(test_pallets[i])
+                                else:
+                                    loose_idx = i - len(test_pallets)
+                                    if loose_idx < len(test_loose):
+                                        loaded_loose.append(test_loose[loose_idx])
+                        
+                        if loaded_pallets or loaded_loose:
+                            # 配送計画を作成
+                            all_loaded_items = []
+                            for pallet in loaded_pallets:
+                                pallet_box = Box(
+                                    width=pallet.width,
+                                    depth=pallet.depth,
+                                    height=pallet.current_height,
+                                    weight=pallet.get_total_weight(),
+                                    item_code='PALLET',
+                                    quantity=1
+                                )
+                                all_loaded_items.append(pallet_box)
+                            all_loaded_items.extend(loaded_loose)
+                            
+                            plan = self._create_delivery_plan(
+                                truck, orders, target_date, all_loaded_items, positions[:len(all_loaded_items)],
+                                loaded_pallets, loaded_loose
+                            )
+                            plans.append(plan)
+                            
+                            # 積載されたアイテムを残りから削除
+                            for pallet in loaded_pallets:
+                                remaining_pallets.remove(pallet)
+                            for item in loaded_loose:
+                                remaining_loose_items.remove(item)
+                            
+                            truck_found = True
+                            break
+            
+            # どのトラックにも積載できなかった場合
+            if not truck_found:
+                if remaining_pallets or remaining_loose_items:
+                    print(f"警告: パレット{len(remaining_pallets)}個、バラ積み{len(remaining_loose_items)}個がどのトラックにも積載できませんでした")
+                    # 最大のトラックを強制的に使用
+                    truck = trucks[0]  # 最大積載量のトラック
+                    
+                    # パレットを優先して1つずつ積載
+                    if remaining_pallets:
+                        forced_pallet = remaining_pallets[0]
+                        pallet_box = Box(
+                            width=forced_pallet.width,
+                            depth=forced_pallet.depth,
+                            height=forced_pallet.current_height,
+                            weight=forced_pallet.get_total_weight(),
+                            item_code='PALLET',
+                            quantity=1
+                        )
+                        plan = self._create_delivery_plan(
+                            truck, orders, target_date, [pallet_box], [Position(0, 0)],
+                            [forced_pallet], []
+                        )
+                        plans.append(plan)
+                        remaining_pallets.remove(forced_pallet)
+                    elif remaining_loose_items:
+                        forced_item = remaining_loose_items[0]
+                        plan = self._create_delivery_plan(
+                            truck, orders, target_date, [forced_item], [Position(0, 0)],
+                            [], [forced_item]
+                        )
+                        plans.append(plan)
+                        remaining_loose_items.remove(forced_item)
         
         return plans
     
     def _create_delivery_plan(self, truck: Truck, orders: List[ShippingOrder], 
-                             target_date, items: List[Box], positions: List[Position]) -> DeliveryPlan:
+                             target_date, items: List[Box], positions: List[Position],
+                             truck_pallets: List[Pallet] = None, truck_loose_items: List[Box] = None) -> DeliveryPlan:
         """配送計画を作成"""
         
         # 配送ルートを最適化
@@ -531,37 +882,401 @@ class DeliveryOptimizer:
                 )
         
         # 積載商品の記録（パレットとバラ積みを区別）
+        pallet_index = 0
         for i, (item, position) in enumerate(zip(items, positions)):
             if item.item_code == 'PALLET':
-                # パレットの場合は代表商品を使用
-                try:
-                    representative_item = Item.objects.first()
-                    if representative_item:
-                        PlanItemLoad.objects.create(
-                            plan=plan,
-                            shipping_order=orders[i % len(orders)],
-                            item=representative_item,
-                            quantity=1,
-                            position_x=position.x,
-                            position_y=position.y,
-                            rotation=position.rotation
-                        )
-                except Exception:
-                    pass
+                # パレットの場合：パレット内の全商品を記録
+                if truck_pallets and pallet_index < len(truck_pallets):
+                    pallet = truck_pallets[pallet_index]
+                    for box in pallet.boxes:
+                        try:
+                            item_obj = Item.objects.get(item_code=box.item_code)
+                            # パレット内の商品を適切な出荷依頼に関連付け
+                            related_order = self._find_related_order(orders, item_obj)
+                            if related_order:
+                                PlanItemLoad.objects.create(
+                                    plan=plan,
+                                    shipping_order=related_order,
+                                    item=item_obj,
+                                    quantity=1,
+                                    position_x=position.x + box.x,  # パレット内の相対位置を加算
+                                    position_y=position.y + box.y,
+                                    rotation=position.rotation
+                                )
+                        except Item.DoesNotExist:
+                            pass
+                    pallet_index += 1
             else:
                 # バラ積み商品の場合
                 try:
                     item_obj = Item.objects.get(item_code=item.item_code)
-                    PlanItemLoad.objects.create(
-                        plan=plan,
-                        shipping_order=orders[i % len(orders)],
-                        item=item_obj,
-                        quantity=item.quantity,
-                        position_x=position.x,
-                        position_y=position.y,
-                        rotation=position.rotation
-                    )
+                    related_order = self._find_related_order(orders, item_obj)
+                    if related_order:
+                        PlanItemLoad.objects.create(
+                            plan=plan,
+                            shipping_order=related_order,
+                            item=item_obj,
+                            quantity=item.quantity,
+                            position_x=position.x,
+                            position_y=position.y,
+                            rotation=position.rotation
+                        )
                 except Item.DoesNotExist:
                     pass
+        
+        return plan
+    
+    def _find_related_order(self, orders: List[ShippingOrder], item: Item) -> ShippingOrder:
+        """商品に関連する出荷依頼を見つける"""
+        for order in orders:
+            for order_item in order.order_items.all():
+                if order_item.item == item:
+                    return order
+                # セット品の場合は部品も確認
+                if order_item.item.parts.filter(parts_code=item.item_code).exists():
+                    return order
+        return orders[0] if orders else None
+    
+    def _get_available_unified_pallets(self, orders: List[ShippingOrder], target_date) -> List['UnifiedPallet']:
+        """利用可能なUnifiedPalletを取得"""
+        # 指定日の注文に関連するUnifiedPalletを取得
+        order_ids = [order.id for order in orders]
+        print(f"=== UnifiedPallet取得 ===")
+        print(f"対象注文ID: {order_ids}")
+        
+        # すでに使用されているパレットを除外
+        used_pallet_ids = PalletLoadHistory.objects.filter(
+            status__in=['USED', 'ALLOCATED']
+        ).values_list('pallet_id', flat=True)
+        print(f"使用済みパレットID: {list(used_pallet_ids)}")
+        
+        available_pallets = UnifiedPallet.objects.filter(
+            delivery_date=target_date,
+            shipping_order_id__in=order_ids
+        ).exclude(
+            id__in=used_pallet_ids
+        ).order_by('pallet_type', '-weight')
+        
+        print(f"利用可能パレット数: {available_pallets.count()}")
+        
+        # 既存のUnifiedPalletがある場合も詳細を表示
+        if available_pallets.exists():
+            print(f"既存のUnifiedPallet詳細:")
+            for pallet in available_pallets:
+                print(f"  ID={pallet.id}, type={pallet.pallet_type}, order_id={pallet.shipping_order_id}")
+            return list(available_pallets)
+        
+        # UnifiedPalletが存在しない場合、パレタイズ設計から作成を試みる
+        print("UnifiedPalletが存在しません。パレタイズ設計から作成を試みます。")
+        print(f"検索対象日: {target_date}")
+        
+        try:
+            # パレタイズ設計を検索
+            palletize_plans = PalletizePlan.objects.filter(delivery_date=target_date)
+            print(f"パレタイズ設計検索結果: {palletize_plans.count()}件")
+            
+            palletize_plan = palletize_plans.first()
+            if palletize_plan:
+                print(f"パレタイズ設計発見: ID={palletize_plan.id}")
+                print(f"  パレット数: {palletize_plan.pallets.count()}")
+                print(f"  バラ積み商品数: {palletize_plan.loose_items.count()}")
+                
+                created_pallets = self._create_unified_pallets_from_palletize_plan(palletize_plan, orders)
+                print(f"作成されたUnifiedPallet数: {len(created_pallets)}")
+                return created_pallets
+            else:
+                print("パレタイズ設計が見つかりません")
+                # デバッグ: 全てのパレタイズ設計を確認
+                all_plans = PalletizePlan.objects.all()
+                print(f"全パレタイズ設計数: {all_plans.count()}")
+                if all_plans.exists():
+                    print("既存のパレタイズ設計:")
+                    for plan in all_plans:
+                        print(f"  ID={plan.id}, 日付={plan.delivery_date}")
+        except Exception as e:
+            print(f"UnifiedPallet作成エラー: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        return []
+    
+    def _create_unified_pallets_from_palletize_plan(self, palletize_plan: 'PalletizePlan', orders: List[ShippingOrder]) -> List['UnifiedPallet']:
+        """パレタイズ設計からUnifiedPalletを作成"""
+        created_pallets = []
+        
+        try:
+            # パレット設定を取得
+            pallet_config = PalletConfiguration.get_default()
+            
+            # REALパレットの作成
+            for pallet_detail in palletize_plan.pallets.all():
+                # パレット詳細の最初の商品の注文を代表として設定
+                first_item = pallet_detail.items.first()
+                representative_order = first_item.shipping_order if first_item else orders[0]
+                
+                # パレット詳細からUnifiedPalletを作成
+                unified_pallet = UnifiedPallet.objects.create(
+                    pallet_type='REAL',
+                    pallet_detail=pallet_detail,
+                    delivery_date=palletize_plan.delivery_date,
+                    width=pallet_config.width,
+                    depth=pallet_config.depth,
+                    height=pallet_config.max_height,
+                    weight=pallet_detail.total_weight,
+                    volume=pallet_detail.total_volume,
+                    shipping_order=representative_order  # 代表的な注文を設定
+                )
+                created_pallets.append(unified_pallet)
+                print(f"REALパレット作成: ID={unified_pallet.id}, 重量={unified_pallet.weight}")
+            
+            # VIRTUALパレット（バラ積み）の作成
+            for loose_item in palletize_plan.loose_items.all():
+                # バラ積み商品の場合、数量は1として扱う
+                # 体積を計算
+                volume = loose_item.width * loose_item.depth * loose_item.height
+                
+                unified_pallet = UnifiedPallet.objects.create(
+                    pallet_type='VIRTUAL',
+                    item=loose_item.item,
+                    item_quantity=1,  # バラ積み商品の数量は1
+                    delivery_date=palletize_plan.delivery_date,
+                    width=loose_item.width,
+                    depth=loose_item.depth,
+                    height=loose_item.height,
+                    weight=loose_item.weight,
+                    volume=volume,
+                    shipping_order=loose_item.shipping_order
+                )
+                created_pallets.append(unified_pallet)
+                print(f"VIRTUALパレット作成: ID={unified_pallet.id}, 商品={loose_item.item.name}")
+                
+        except Exception as e:
+            print(f"UnifiedPallet作成中にエラー: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+        
+        return created_pallets
+    
+    def _allocate_pallets_for_region(self, region_orders: List[ShippingOrder], 
+                                   available_pallets: List['UnifiedPallet']) -> List['UnifiedPallet']:
+        """地域の注文に必要なパレットを割り当て"""
+        region_pallets = []
+        
+        # 地域の注文IDセット
+        region_order_ids = {order.id for order in region_orders}
+        print(f"地域注文ID: {region_order_ids}")
+        
+        print(f"利用可能パレット数: {len(available_pallets)}")
+        
+        if not available_pallets:
+            print("利用可能なパレットがありません")
+            return region_pallets
+        
+        # 該当する注文のパレットを選択
+        for pallet in available_pallets:
+            print(f"パレット ID={pallet.id}, type={pallet.pallet_type}, order_id={pallet.shipping_order_id}")
+            
+            # REALパレットの場合、shipping_order_idがNullの可能性があるため、
+            # パレット詳細の商品から関連する注文を調べる
+            if pallet.pallet_type == 'REAL':
+                if pallet.pallet_detail:
+                    # パレット詳細の商品から注文IDを取得
+                    pallet_order_ids = set()
+                    for pallet_item in pallet.pallet_detail.items.all():
+                        pallet_order_ids.add(pallet_item.shipping_order_id)
+                    
+                    print(f"REALパレット {pallet.id} の注文ID: {pallet_order_ids}")
+                    
+                    # 地域の注文と重複があるかチェック
+                    if pallet_order_ids & region_order_ids:
+                        region_pallets.append(pallet)
+                        print(f"REALパレット {pallet.id} を地域に割り当て (注文ID: {pallet_order_ids})")
+                    else:
+                        print(f"REALパレット {pallet.id} は地域の注文と一致しません")
+                else:
+                    print(f"警告: REALパレット {pallet.id} にパレット詳細がありません")
+            
+            elif pallet.pallet_type == 'VIRTUAL':
+                # VIRTUALパレットの場合は直接shipping_order_idをチェック
+                if pallet.shipping_order_id in region_order_ids:
+                    region_pallets.append(pallet)
+                    print(f"VIRTUALパレット {pallet.id} を地域に割り当て (注文ID: {pallet.shipping_order_id})")
+                else:
+                    print(f"VIRTUALパレット {pallet.id} は地域の注文と一致しません (注文ID: {pallet.shipping_order_id})")
+        
+        print(f"地域に割り当てたパレット数: {len(region_pallets)}")
+        return region_pallets
+    
+    def _pack_trucks_with_unified_pallets(self, pallets: List['UnifiedPallet'], 
+                                        orders: List[ShippingOrder], target_date) -> List[DeliveryPlan]:
+        """統一パレットシステムでトラックに積載"""
+        plans = []
+        trucks = list(Truck.objects.filter(width__gt=0, depth__gt=0).order_by('-payload'))
+        
+        print(f"=== トラック積載開始 ===")
+        print(f"積載対象パレット数: {len(pallets)}")
+        print(f"利用可能トラック数: {len(trucks)}")
+        
+        if not trucks:
+            print("警告: 使用可能なトラックがありません")
+            return plans
+        
+        if not pallets:
+            print("警告: 積載するパレットがありません")
+            return plans
+        
+        # トラック情報を表示
+        for i, truck in enumerate(trucks):
+            print(f"トラック{i+1}: {truck.width}x{truck.depth}cm, 積載量{truck.payload}kg")
+        
+        remaining_pallets = pallets.copy()
+        
+        # すべてのパレットが積載されるまで繰り返し
+        while remaining_pallets:
+            truck_found = False
+            
+            # 各トラックタイプを試す
+            for truck in trucks:
+                # トラックに積載するパレットを選択
+                truck_pallets = []
+                current_weight = 0
+                truck_capacity = truck.payload
+                
+                # 2D配置でパッキング可能なパレットを選択
+                packer = BinPacking2D(truck.width, truck.depth)
+                test_boxes = []
+                test_pallets = []
+                
+                for pallet in remaining_pallets:
+                    # パレットがトラックに入るかチェック
+                    if (pallet.width <= truck.width and pallet.depth <= truck.depth and 
+                        current_weight + pallet.weight <= truck_capacity):
+                        box = Box(
+                            width=pallet.width,
+                            depth=pallet.depth,
+                            height=pallet.height,
+                            weight=pallet.weight,
+                            item_code=f'PALLET_{pallet.id}',
+                            quantity=1
+                        )
+                        test_boxes.append(box)
+                        test_pallets.append(pallet)
+                        current_weight += pallet.weight
+                
+                if test_boxes:
+                    # 2D配置を試行
+                    positions = packer.pack(test_boxes)
+                    
+                    if positions:
+                        # 実際に積載されたパレットを特定
+                        loaded_pallets = []
+                        for i, pos in enumerate(positions):
+                            if pos and i < len(test_pallets):
+                                loaded_pallets.append(test_pallets[i])
+                        
+                        if loaded_pallets:
+                            # 配送計画を作成
+                            plan = self._create_delivery_plan_with_unified_pallets(
+                                truck, orders, target_date, loaded_pallets, positions[:len(loaded_pallets)]
+                            )
+                            plans.append(plan)
+                            
+                            # 積載されたパレットを残りから削除
+                            for pallet in loaded_pallets:
+                                remaining_pallets.remove(pallet)
+                            
+                            truck_found = True
+                            break
+            
+            # どのトラックにも積載できなかった場合
+            if not truck_found:
+                if remaining_pallets:
+                    print(f"警告: {len(remaining_pallets)}個のパレットがどのトラックにも積載できませんでした")
+                    # 最大のトラックを強制的に使用
+                    truck = trucks[0]  # 最大積載量のトラック
+                    forced_pallets = remaining_pallets[:1]  # 1つずつ積載
+                    
+                    # 強制的に配送計画を作成
+                    plan = self._create_delivery_plan_with_unified_pallets(
+                        truck, orders, target_date, forced_pallets, [Position(0, 0)]
+                    )
+                    plans.append(plan)
+                    
+                    for pallet in forced_pallets:
+                        remaining_pallets.remove(pallet)
+        
+        return plans
+    
+    def _create_delivery_plan_with_unified_pallets(self, truck: Truck, orders: List[ShippingOrder], 
+                                                 target_date, pallets: List['UnifiedPallet'], 
+                                                 positions: List[Position]) -> DeliveryPlan:
+        """統一パレットシステムで配送計画を作成"""
+        
+        # 配送ルートを最適化
+        destinations = []
+        for order in orders:
+            if order.destination.latitude and order.destination.longitude:
+                destinations.append((
+                    float(order.destination.latitude), 
+                    float(order.destination.longitude)
+                ))
+        
+        if destinations:
+            route_indices = self.route_optimizer.optimize_route(destinations)
+        else:
+            route_indices = list(range(len(orders)))
+        
+        # 重量・体積計算
+        total_weight = sum(pallet.weight for pallet in pallets)
+        total_volume = sum(pallet.volume for pallet in pallets)
+        
+        # 出発時刻計算
+        departure_time = datetime.combine(target_date, datetime.min.time().replace(hour=8))
+        
+        # 配送計画作成
+        plan = DeliveryPlan.objects.create(
+            plan_date=target_date,
+            truck=truck,
+            departure_time=departure_time,
+            total_weight=total_weight,
+            total_volume=total_volume,
+            route_distance_km=0
+        )
+        
+        # 配送順序の作成
+        current_time = departure_time
+        for i, order_idx in enumerate(route_indices):
+            if order_idx < len(orders):
+                order = orders[order_idx]
+                travel_time = 30 if i == 0 else 20  # 分
+                current_time += timedelta(minutes=travel_time)
+                
+                PlanOrderDetail.objects.create(
+                    plan=plan,
+                    shipping_order=order,
+                    delivery_sequence=i + 1,
+                    estimated_arrival=current_time,
+                    travel_time_minutes=travel_time
+                )
+        
+        # LoadPalletとPalletLoadHistoryの作成
+        for i, (pallet, position) in enumerate(zip(pallets, positions)):
+            # LoadPalletを作成
+            LoadPallet.objects.create(
+                plan=plan,
+                pallet=pallet,
+                position_x=position.x,
+                position_y=position.y,
+                rotation=position.rotation,
+                load_sequence=i + 1
+            )
+            
+            # PalletLoadHistoryを作成
+            PalletLoadHistory.objects.create(
+                pallet=pallet,
+                plan=plan,
+                status='USED'
+            )
         
         return plan

@@ -192,3 +192,236 @@ class PlanItemLoad(models.Model):
         
     def __str__(self):
         return f"{self.plan} - {self.item.name} x {self.quantity}"
+
+
+class PalletizePlan(models.Model):
+    """パレタイズ設計結果"""
+    delivery_date = models.DateField('配送日')
+    total_items = models.IntegerField('総商品数', validators=[MinValueValidator(0)])
+    total_pallets = models.IntegerField('パレット数', validators=[MinValueValidator(0)])
+    total_loose_items = models.IntegerField('バラ積み商品数', validators=[MinValueValidator(0)])
+    created_at = models.DateTimeField('作成日時', auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'パレタイズ設計'
+        verbose_name_plural = 'パレタイズ設計'
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"パレタイズ設計 {self.delivery_date} - {self.total_pallets}パレット"
+
+
+class PalletDetail(models.Model):
+    """パレット詳細"""
+    palletize_plan = models.ForeignKey(PalletizePlan, on_delete=models.CASCADE, related_name='pallets')
+    pallet_number = models.IntegerField('パレット番号', validators=[MinValueValidator(1)])
+    total_weight = models.FloatField('総重量(kg)', validators=[MinValueValidator(0)])
+    total_volume = models.IntegerField('総体積(cm³)', validators=[MinValueValidator(0)])
+    utilization = models.FloatField('積載率(%)', validators=[MinValueValidator(0)])
+    
+    class Meta:
+        verbose_name = 'パレット詳細'
+        verbose_name_plural = 'パレット詳細'
+        ordering = ['pallet_number']
+        unique_together = ['palletize_plan', 'pallet_number']
+        
+    def __str__(self):
+        return f"{self.palletize_plan} - パレット#{self.pallet_number}"
+
+
+class PalletItem(models.Model):
+    """パレット積載商品"""
+    pallet = models.ForeignKey(PalletDetail, on_delete=models.CASCADE, related_name='items')
+    shipping_order = models.ForeignKey(ShippingOrder, on_delete=models.PROTECT, verbose_name='出荷依頼')
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, verbose_name='品目')
+    part = models.ForeignKey(Part, on_delete=models.PROTECT, null=True, blank=True, verbose_name='部品')
+    position_x = models.IntegerField('X座標(cm)', validators=[MinValueValidator(0)])
+    position_y = models.IntegerField('Y座標(cm)', validators=[MinValueValidator(0)])
+    position_z = models.IntegerField('Z座標(cm)', validators=[MinValueValidator(0)])
+    width = models.IntegerField('幅(cm)', validators=[MinValueValidator(0)])
+    depth = models.IntegerField('奥行(cm)', validators=[MinValueValidator(0)])
+    height = models.IntegerField('高さ(cm)', validators=[MinValueValidator(0)])
+    weight = models.FloatField('重量(kg)', validators=[MinValueValidator(0)])
+    
+    class Meta:
+        verbose_name = 'パレット積載商品'
+        verbose_name_plural = 'パレット積載商品'
+        
+    def __str__(self):
+        if self.part:
+            return f"{self.pallet} - {self.part.parts_code}"
+        return f"{self.pallet} - {self.item.item_code}"
+
+
+class LooseItem(models.Model):
+    """バラ積み商品"""
+    palletize_plan = models.ForeignKey(PalletizePlan, on_delete=models.CASCADE, related_name='loose_items')
+    shipping_order = models.ForeignKey(ShippingOrder, on_delete=models.PROTECT, verbose_name='出荷依頼')
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, verbose_name='品目')
+    width = models.IntegerField('幅(cm)', validators=[MinValueValidator(0)])
+    depth = models.IntegerField('奥行(cm)', validators=[MinValueValidator(0)])
+    height = models.IntegerField('高さ(cm)', validators=[MinValueValidator(0)])
+    weight = models.FloatField('重量(kg)', validators=[MinValueValidator(0)])
+    reason = models.CharField('理由', max_length=100)
+    
+    class Meta:
+        verbose_name = 'バラ積み商品'
+        verbose_name_plural = 'バラ積み商品'
+        
+    def __str__(self):
+        return f"{self.palletize_plan} - {self.item.name} (バラ積み)"
+
+
+class PalletConfiguration(models.Model):
+    """パレット設定"""
+    name = models.CharField('設定名', max_length=100, unique=True)
+    width = models.IntegerField('パレット幅(cm)', default=100, validators=[MinValueValidator(1)])
+    depth = models.IntegerField('パレット奥行(cm)', default=100, validators=[MinValueValidator(1)])
+    max_height = models.IntegerField('最大積み上げ高さ(cm)', default=80, validators=[MinValueValidator(1)])
+    max_weight = models.FloatField('最大積載重量(kg)', default=100.0, validators=[MinValueValidator(0.1)])
+    is_default = models.BooleanField('デフォルト設定', default=False)
+    created_at = models.DateTimeField('作成日時', auto_now_add=True)
+    updated_at = models.DateTimeField('更新日時', auto_now=True)
+    
+    class Meta:
+        verbose_name = 'パレット設定'
+        verbose_name_plural = 'パレット設定'
+        ordering = ['-is_default', 'name']
+        
+    def __str__(self):
+        default_text = " (デフォルト)" if self.is_default else ""
+        return f"{self.name}{default_text} - {self.width}×{self.depth}×{self.max_height}cm, {self.max_weight}kg"
+    
+    def save(self, *args, **kwargs):
+        """デフォルト設定は1つのみ許可"""
+        if self.is_default:
+            # 他のデフォルト設定を無効化
+            PalletConfiguration.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+    
+    @classmethod
+    def get_default(cls):
+        """デフォルト設定を取得"""
+        try:
+            return cls.objects.get(is_default=True)
+        except cls.DoesNotExist:
+            # デフォルト設定がない場合は作成
+            return cls.objects.create(
+                name="標準パレット",
+                width=100,
+                depth=100,
+                max_height=80,
+                max_weight=100.0,
+                is_default=True
+            )
+    
+    @property
+    def pallet_area(self):
+        """パレット面積（cm²）"""
+        return self.width * self.depth
+    
+    @property
+    def max_volume(self):
+        """最大体積（cm³）"""
+        return self.width * self.depth * self.max_height
+
+
+class UnifiedPallet(models.Model):
+    """統一パレットテーブル（パレタイズされたパレットと疑似パレット）"""
+    PALLET_TYPE_CHOICES = [
+        ('REAL', 'パレタイズされたパレット'),
+        ('VIRTUAL', '疑似パレット（バラ積み）'),
+    ]
+    
+    pallet_type = models.CharField('パレットタイプ', max_length=20, choices=PALLET_TYPE_CHOICES)
+    delivery_date = models.DateField('配送日')
+    width = models.IntegerField('パレット幅(cm)', validators=[MinValueValidator(1)])
+    depth = models.IntegerField('パレット奥行(cm)', validators=[MinValueValidator(1)])
+    height = models.IntegerField('パレット高さ(cm)', validators=[MinValueValidator(1)])
+    weight = models.FloatField('パレット重量(kg)', validators=[MinValueValidator(0)])
+    volume = models.IntegerField('パレット体積(cm³)', validators=[MinValueValidator(1)])
+    shipping_order = models.ForeignKey(ShippingOrder, on_delete=models.PROTECT, verbose_name='出荷依頼')
+    
+    # REALパレットの場合
+    pallet_detail = models.ForeignKey(PalletDetail, on_delete=models.CASCADE, null=True, blank=True, verbose_name='パレット詳細')
+    
+    # VIRTUALパレットの場合
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, null=True, blank=True, verbose_name='品目')
+    item_quantity = models.IntegerField('商品数量', null=True, blank=True, validators=[MinValueValidator(1)])
+    
+    created_at = models.DateTimeField('作成日時', auto_now_add=True)
+    
+    class Meta:
+        verbose_name = '統一パレット'
+        verbose_name_plural = '統一パレット'
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        if self.pallet_type == 'REAL':
+            return f"パレット#{self.pallet_detail.pallet_number} - {self.shipping_order.order_number}"
+        else:
+            return f"疑似パレット({self.item.name}) - {self.shipping_order.order_number}"
+    
+    def clean(self):
+        """バリデーション"""
+        from django.core.exceptions import ValidationError
+        
+        if self.pallet_type == 'REAL':
+            if not self.pallet_detail:
+                raise ValidationError('REALパレットはパレット詳細が必要です')
+            if self.item or self.item_quantity:
+                raise ValidationError('REALパレットには品目情報は不要です')
+        elif self.pallet_type == 'VIRTUAL':
+            if not self.item or not self.item_quantity:
+                raise ValidationError('VIRTUALパレットは品目と数量が必要です')
+            if self.pallet_detail:
+                raise ValidationError('VIRTUALパレットにはパレット詳細は不要です')
+    
+    @property
+    def display_name(self):
+        """表示名"""
+        if self.pallet_type == 'REAL':
+            return f"パレット#{self.pallet_detail.pallet_number}"
+        else:
+            return f"{self.item.name} x{self.item_quantity}"
+
+
+class LoadPallet(models.Model):
+    """積載パレットテーブル（旧PlanItemLoadsの置き換え）"""
+    plan = models.ForeignKey(DeliveryPlan, on_delete=models.CASCADE, related_name='load_pallets')
+    pallet = models.ForeignKey(UnifiedPallet, on_delete=models.PROTECT, verbose_name='パレット')
+    position_x = models.IntegerField('積載位置X座標(cm)', validators=[MinValueValidator(0)])
+    position_y = models.IntegerField('積載位置Y座標(cm)', validators=[MinValueValidator(0)])
+    rotation = models.IntegerField('回転角度', default=0, choices=[(0, '0°'), (90, '90°'), (180, '180°'), (270, '270°')])
+    load_sequence = models.IntegerField('積み込み順序', validators=[MinValueValidator(1)])
+    
+    class Meta:
+        verbose_name = '積載パレット'
+        verbose_name_plural = '積載パレット'
+        ordering = ['load_sequence']
+        
+    def __str__(self):
+        return f"{self.plan} - {self.pallet.display_name}"
+
+
+class PalletLoadHistory(models.Model):
+    """パレット積載履歴テーブル"""
+    STATUS_CHOICES = [
+        ('ALLOCATED', '割り当て済み'),
+        ('USED', '使用中'),
+        ('COMPLETED', '完了'),
+    ]
+    
+    pallet = models.ForeignKey(UnifiedPallet, on_delete=models.CASCADE, related_name='load_history')
+    plan = models.ForeignKey(DeliveryPlan, on_delete=models.CASCADE, verbose_name='配送計画')
+    allocated_at = models.DateTimeField('割り当て日時', auto_now_add=True)
+    status = models.CharField('ステータス', max_length=20, choices=STATUS_CHOICES, default='ALLOCATED')
+    
+    class Meta:
+        verbose_name = 'パレット積載履歴'
+        verbose_name_plural = 'パレット積載履歴'
+        ordering = ['-allocated_at']
+        unique_together = ['pallet', 'plan']
+        
+    def __str__(self):
+        return f"{self.pallet.display_name} - {self.plan} ({self.get_status_display()})"

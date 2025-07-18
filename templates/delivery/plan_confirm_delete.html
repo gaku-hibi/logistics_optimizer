@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}配送計画削除確認{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> 配送計画削除確認
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-warning"></i>
+                        <strong>注意:</strong> この操作は取り消すことができません。
+                    </div>
+                    
+                    <p class="mb-4">以下の配送計画を削除しますか？</p>
+                    
+                    <!-- 配送計画情報 -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">配送計画詳細</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>計画ID:</strong> {{ plan.id }}</p>
+                                    <p><strong>配送日:</strong> {{ plan.plan_date|date:'Y年m月d日' }}</p>
+                                    <p><strong>出発時刻:</strong> {{ plan.departure_time|date:'Y年m月d日 H:i' }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>使用トラック:</strong> {{ plan.truck }}</p>
+                                    <p><strong>総重量:</strong> {{ plan.total_weight|floatformat:1 }} kg</p>
+                                    <p><strong>総体積:</strong> {{ plan.total_volume|floatformat:0 }} cm³</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 関連データ情報 -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">削除される関連データ</h5>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    配送計画明細（配送ルート）
+                                    <span class="badge bg-secondary">{{ order_details_count }}件</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    積載商品データ
+                                    <span class="badge bg-secondary">{{ item_loads_count }}件</span>
+                                </li>
+                            </ul>
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    <i class="bi bi-info-circle"></i>
+                                    出荷依頼、商品、トラックなどのマスタデータは削除されません。
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 操作ボタン -->
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'delivery:plan_detail' plan.id %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> キャンセル
+                        </a>
+                        <form method="post" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('本当に削除しますか？')">
+                                <i class="bi bi-trash"></i> 削除する
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}パレタイズ設計{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">パレタイズ設計</h1>
+            
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted">配送日を選択して、その日の出荷商品のパレタイズ設計を行います。</p>
+                    
+                    <form method="post" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label for="delivery_date" class="form-label">配送日</label>
+                            <select name="delivery_date" id="delivery_date" class="form-select" required>
+                                <option value="">配送日を選択してください</option>
+                                {% for date in delivery_dates %}
+                                    <option value="{{ date|date:'Y-m-d' }}">{{ date|date:'Y年m月d日' }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="invalid-feedback">
+                                配送日を選択してください。
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" id="submit-btn" class="btn btn-primary">
+                                <i class="bi bi-box-seam"></i> パレタイズ設計を実行
+                            </button>
+                            <a href="{% url 'delivery:index' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> 戻る
+                            </a>
+                        </div>
+                        
+                        <!-- 処理中表示 -->
+                        <div id="processing-message" class="mt-4 alert alert-info" style="display: none;">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border text-primary me-3" role="status">
+                                    <span class="visually-hidden">処理中...</span>
+                                </div>
+                                <div>
+                                    <strong>パレタイズ設計を実行中...</strong><br>
+                                    <small>しばらくお待ちください。処理には数分かかる場合があります。</small>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">パレタイズ設計について</h5>
+                </div>
+                <div class="card-body">
+                    <p>パレタイズ設計では、以下の処理を行います：</p>
+                    <ul>
+                        <li>選択した配送日の全ての出荷依頼から商品を集計</li>
+                        <li>標準パレット（1.1m × 1.1m）への最適な積載方法を計算</li>
+                        <li>パレットに載らない大型商品の識別（バラ積み対象）</li>
+                        <li>積載効率と安定性を考慮した3D配置の最適化</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Bootstrap validation
+(function() {
+    'use strict'
+    var forms = document.querySelectorAll('.needs-validation')
+    Array.prototype.slice.call(forms).forEach(function(form) {
+        form.addEventListener('submit', function(event) {
+            if (!form.checkValidity()) {
+                event.preventDefault()
+                event.stopPropagation()
+            } else {
+                // バリデーション成功時に処理中表示
+                var processingMessage = document.getElementById('processing-message');
+                var submitBtn = document.getElementById('submit-btn');
+                
+                processingMessage.style.display = 'block';
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 処理中...';
+            }
+            form.classList.add('was-validated')
+        }, false)
+    })
+})()
+</script>
+{% endblock %}

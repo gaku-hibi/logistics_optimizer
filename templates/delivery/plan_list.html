@@ -14,6 +14,11 @@
                 <a href="{% url 'delivery:optimize_delivery' %}" class="btn btn-success">
                     <i class="fas fa-magic"></i> 最適化実行
                 </a>
+                {% if plans %}
+                <button type="button" class="btn btn-outline-danger ms-2" data-bs-toggle="modal" data-bs-target="#deleteAllModal">
+                    <i class="fas fa-trash-alt"></i> 全削除
+                </button>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -101,6 +106,10 @@
                                                class="btn btn-outline-secondary">
                                                 <i class="fas fa-file-pdf"></i>
                                             </a>
+                                            <a href="{% url 'delivery:plan_delete' plan.pk %}" 
+                                               class="btn btn-outline-danger">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
                                         </div>
                                     </td>
                                 </tr>
@@ -149,6 +158,54 @@
                         </a>
                     </div>
                 {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 全削除確認モーダル -->
+<div class="modal fade" id="deleteAllModal" tabindex="-1" aria-labelledby="deleteAllModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteAllModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> 全削除確認
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-warning"></i>
+                    <strong>注意:</strong> この操作は取り消すことができません。
+                </div>
+                <p>すべての配送計画を削除しますか？</p>
+                <div class="row">
+                    <div class="col-6">
+                        <strong>削除される計画数:</strong>
+                    </div>
+                    <div class="col-6">
+                        <span class="badge bg-danger">{{ plans.paginator.count }}件</span>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-12">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i>
+                            出荷依頼、商品、荷主、配送先などのマスタデータは削除されません。
+                        </small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> キャンセル
+                </button>
+                <form method="post" action="{% url 'delivery:plan_delete_all' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt"></i> 全削除実行
+                    </button>
+                </form>
             </div>
         </div>
     </div>
