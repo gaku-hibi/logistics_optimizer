@@ -227,6 +227,41 @@ class PalletDetail(models.Model):
         
     def __str__(self):
         return f"{self.palletize_plan} - パレット#{self.pallet_number}"
+    
+    def get_related_order_numbers(self):
+        """関連する出荷依頼番号のリストを取得"""
+        return list(self.items.values_list('shipping_order__order_number', flat=True).distinct())
+    
+    def get_item_summary(self):
+        """商品の集計情報を取得（上位3種類）"""
+        from collections import defaultdict
+        
+        item_counts = defaultdict(int)
+        item_info = {}
+        
+        for pallet_item in self.items.all():
+            if pallet_item.part:
+                item_code = pallet_item.part.parts_code
+                item_name = f"{pallet_item.item.name}（部品）"
+            else:
+                item_code = pallet_item.item.item_code
+                item_name = pallet_item.item.name
+            
+            item_counts[item_code] += 1
+            if item_code not in item_info:
+                item_info[item_code] = {
+                    'item_code': item_code,
+                    'item_name': item_name,
+                    'quantity': 0
+                }
+        
+        # 件数を更新
+        for item_code, count in item_counts.items():
+            item_info[item_code]['quantity'] = count
+        
+        # 数量の多い順に並び替えて上位3つを返す
+        sorted_items = sorted(item_info.values(), key=lambda x: x['quantity'], reverse=True)
+        return sorted_items[:3]
 
 
 class PalletItem(models.Model):
@@ -340,7 +375,9 @@ class UnifiedPallet(models.Model):
     height = models.IntegerField('パレット高さ(cm)', validators=[MinValueValidator(1)])
     weight = models.FloatField('パレット重量(kg)', validators=[MinValueValidator(0)])
     volume = models.IntegerField('パレット体積(cm³)', validators=[MinValueValidator(1)])
-    shipping_order = models.ForeignKey(ShippingOrder, on_delete=models.PROTECT, verbose_name='出荷依頼')
+    shipping_order = models.ForeignKey(ShippingOrder, on_delete=models.PROTECT, verbose_name='出荷依頼', null=True, blank=True)
+    # 複数の注文を含むパレットのため、多対多関係を追加
+    related_orders = models.ManyToManyField(ShippingOrder, related_name='unified_pallets', verbose_name='関連する出荷依頼', blank=True)
     
     # REALパレットの場合
     pallet_detail = models.ForeignKey(PalletDetail, on_delete=models.CASCADE, null=True, blank=True, verbose_name='パレット詳細')

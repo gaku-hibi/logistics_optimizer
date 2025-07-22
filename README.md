@@ -176,18 +176,6 @@ docker-compose down
 docker-compose up --build
 ```
 
-## カスタマイズ
-
-### 新しい最適化アルゴリズムの追加
-1. `delivery/optimization.py`に新しいクラスを追加
-2. `DeliveryOptimizer`クラスで使用するように修正
-3. 必要に応じてパラメータ調整用の設定画面を追加
-
-### 新しいレポート形式の追加
-1. `delivery/reports.py`に新しい関数を追加
-2. `views.py`に対応するビューを追加
-3. テンプレートに出力ボタンを追加
-
 ## トラブルシューティング
 
 ### よくある問題と解決方法

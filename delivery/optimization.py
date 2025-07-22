@@ -813,7 +813,9 @@ class DeliveryOptimizer:
                             quantity=1
                         )
                         plan = self._create_delivery_plan(
-                            truck, orders, target_date, [pallet_box], [Position(0, 0)],
+                            truck, orders, target_date, [pallet_box], [Position(
+                                x=0, y=0, width=pallet_box.width, depth=pallet_box.depth, rotation=0
+                            )],
                             [forced_pallet], []
                         )
                         plans.append(plan)
@@ -821,7 +823,9 @@ class DeliveryOptimizer:
                     elif remaining_loose_items:
                         forced_item = remaining_loose_items[0]
                         plan = self._create_delivery_plan(
-                            truck, orders, target_date, [forced_item], [Position(0, 0)],
+                            truck, orders, target_date, [forced_item], [Position(
+                                x=0, y=0, width=forced_item.width, depth=forced_item.depth, rotation=0
+                            )],
                             [], [forced_item]
                         )
                         plans.append(plan)
@@ -1026,8 +1030,19 @@ class DeliveryOptimizer:
                     volume=pallet_detail.total_volume,
                     shipping_order=representative_order  # 代表的な注文を設定
                 )
+                
+                # パレットに含まれる全ての注文を関連付ける
+                pallet_orders = []
+                for pallet_item in pallet_detail.items.all():
+                    if pallet_item.shipping_order not in pallet_orders:
+                        pallet_orders.append(pallet_item.shipping_order)
+                unified_pallet.related_orders.set(pallet_orders)
+                
                 created_pallets.append(unified_pallet)
-                print(f"REALパレット作成: ID={unified_pallet.id}, 重量={unified_pallet.weight}")
+                
+                # デバッグ情報を追加
+                pallet_order_ids = list(pallet_detail.items.values_list('shipping_order_id', flat=True).distinct())
+                print(f"REALパレット作成: ID={unified_pallet.id}, 重量={unified_pallet.weight}, 含まれる注文ID: {pallet_order_ids}")
             
             # VIRTUALパレット（バラ積み）の作成
             for loose_item in palletize_plan.loose_items.all():
@@ -1047,6 +1062,9 @@ class DeliveryOptimizer:
                     volume=volume,
                     shipping_order=loose_item.shipping_order
                 )
+                # VIRTUALパレットも関連注文を設定
+                unified_pallet.related_orders.set([loose_item.shipping_order])
+                
                 created_pallets.append(unified_pallet)
                 print(f"VIRTUALパレット作成: ID={unified_pallet.id}, 商品={loose_item.item.name}")
                 
@@ -1077,36 +1095,54 @@ class DeliveryOptimizer:
         for pallet in available_pallets:
             print(f"パレット ID={pallet.id}, type={pallet.pallet_type}, order_id={pallet.shipping_order_id}")
             
-            # REALパレットの場合、shipping_order_idがNullの可能性があるため、
-            # パレット詳細の商品から関連する注文を調べる
-            if pallet.pallet_type == 'REAL':
-                if pallet.pallet_detail:
-                    # パレット詳細の商品から注文IDを取得
-                    pallet_order_ids = set()
-                    for pallet_item in pallet.pallet_detail.items.all():
-                        pallet_order_ids.add(pallet_item.shipping_order_id)
-                    
-                    print(f"REALパレット {pallet.id} の注文ID: {pallet_order_ids}")
-                    
-                    # 地域の注文と重複があるかチェック
-                    if pallet_order_ids & region_order_ids:
-                        region_pallets.append(pallet)
-                        print(f"REALパレット {pallet.id} を地域に割り当て (注文ID: {pallet_order_ids})")
-                    else:
-                        print(f"REALパレット {pallet.id} は地域の注文と一致しません")
-                else:
-                    print(f"警告: REALパレット {pallet.id} にパレット詳細がありません")
+            # related_ordersフィールドを使用して判定
+            pallet_order_ids = set(pallet.related_orders.values_list('id', flat=True))
             
-            elif pallet.pallet_type == 'VIRTUAL':
-                # VIRTUALパレットの場合は直接shipping_order_idをチェック
-                if pallet.shipping_order_id in region_order_ids:
-                    region_pallets.append(pallet)
-                    print(f"VIRTUALパレット {pallet.id} を地域に割り当て (注文ID: {pallet.shipping_order_id})")
-                else:
-                    print(f"VIRTUALパレット {pallet.id} は地域の注文と一致しません (注文ID: {pallet.shipping_order_id})")
+            print(f"パレット {pallet.id} (type={pallet.pallet_type}) の関連注文ID: {pallet_order_ids}")
+            
+            # 地域の注文と重複があるかチェック
+            if pallet_order_ids & region_order_ids:
+                region_pallets.append(pallet)
+                print(f"パレット {pallet.id} を地域に割り当て (注文ID: {pallet_order_ids})")
+            else:
+                print(f"パレット {pallet.id} は地域の注文と一致しません")
         
         print(f"地域に割り当てたパレット数: {len(region_pallets)}")
         return region_pallets
+    
+    def _group_pallets_by_order(self, pallets: List['UnifiedPallet']) -> dict:
+        """パレットを出荷依頼単位でグループ化"""
+        order_groups = {}
+        
+        for pallet in pallets:
+            # パレットに関連する全ての注文IDを取得
+            related_order_ids = set(pallet.related_orders.values_list('id', flat=True))
+            
+            if related_order_ids:
+                # 複数の注文に関連するパレットは、最初の注文のグループに入れる
+                primary_order_id = min(related_order_ids)
+                
+                if primary_order_id not in order_groups:
+                    order_groups[primary_order_id] = []
+                order_groups[primary_order_id].append(pallet)
+                
+                print(f"パレット {pallet.id} を注文 {primary_order_id} のグループに追加")
+            else:
+                # 関連する注文がない場合は、shipping_orderを使用
+                if pallet.shipping_order:
+                    order_id = pallet.shipping_order.id
+                    if order_id not in order_groups:
+                        order_groups[order_id] = []
+                    order_groups[order_id].append(pallet)
+                    print(f"パレット {pallet.id} を注文 {order_id} のグループに追加（shipping_order使用）")
+                else:
+                    print(f"警告: パレット {pallet.id} に関連する注文がありません")
+        
+        print(f"\n出荷依頼グループ数: {len(order_groups)}")
+        for order_id, group_pallets in order_groups.items():
+            print(f"  注文 {order_id}: {len(group_pallets)}個のパレット")
+        
+        return order_groups
     
     def _pack_trucks_with_unified_pallets(self, pallets: List['UnifiedPallet'], 
                                         orders: List[ShippingOrder], target_date) -> List[DeliveryPlan]:
@@ -1130,81 +1166,129 @@ class DeliveryOptimizer:
         for i, truck in enumerate(trucks):
             print(f"トラック{i+1}: {truck.width}x{truck.depth}cm, 積載量{truck.payload}kg")
         
-        remaining_pallets = pallets.copy()
+        # 出荷依頼単位でパレットをグループ化
+        order_pallet_groups = self._group_pallets_by_order(pallets)
+        remaining_order_groups = list(order_pallet_groups.items())
         
-        # すべてのパレットが積載されるまで繰り返し
-        while remaining_pallets:
+        # すべての出荷依頼グループが積載されるまで繰り返し
+        while remaining_order_groups:
             truck_found = False
             
             # 各トラックタイプを試す
             for truck in trucks:
-                # トラックに積載するパレットを選択
-                truck_pallets = []
+                truck_order_groups = []  # このトラックに積載する出荷依頼グループ
                 current_weight = 0
                 truck_capacity = truck.payload
                 
-                # 2D配置でパッキング可能なパレットを選択
+                # 2D配置でパッキング可能な出荷依頼グループを選択
                 packer = BinPacking2D(truck.width, truck.depth)
                 test_boxes = []
                 test_pallets = []
+                test_group_info = []  # (order_id, group_pallets) のリスト
                 
-                for pallet in remaining_pallets:
-                    # パレットがトラックに入るかチェック
-                    if (pallet.width <= truck.width and pallet.depth <= truck.depth and 
-                        current_weight + pallet.weight <= truck_capacity):
-                        box = Box(
-                            width=pallet.width,
-                            depth=pallet.depth,
-                            height=pallet.height,
-                            weight=pallet.weight,
-                            item_code=f'PALLET_{pallet.id}',
-                            quantity=1
-                        )
-                        test_boxes.append(box)
-                        test_pallets.append(pallet)
-                        current_weight += pallet.weight
-                
-                if test_boxes:
-                    # 2D配置を試行
-                    positions = packer.pack(test_boxes)
+                for order_id, group_pallets in remaining_order_groups:
+                    # 出荷依頼全体の重量・サイズをチェック
+                    group_weight = sum(p.weight for p in group_pallets)
                     
-                    if positions:
-                        # 実際に積載されたパレットを特定
-                        loaded_pallets = []
-                        for i, pos in enumerate(positions):
-                            if pos and i < len(test_pallets):
-                                loaded_pallets.append(test_pallets[i])
-                        
-                        if loaded_pallets:
-                            # 配送計画を作成
-                            plan = self._create_delivery_plan_with_unified_pallets(
-                                truck, orders, target_date, loaded_pallets, positions[:len(loaded_pallets)]
+                    # 重量制限チェック
+                    if current_weight + group_weight > truck_capacity:
+                        print(f"注文 {order_id} は重量制限により積載不可 (必要: {group_weight}kg, 残り容量: {truck_capacity - current_weight}kg)")
+                        continue
+                    
+                    # 全パレットがトラックサイズに収まるかチェック
+                    group_boxes = []
+                    can_fit_all = True
+                    
+                    for pallet in group_pallets:
+                        if pallet.width <= truck.width and pallet.depth <= truck.depth:
+                            box = Box(
+                                width=pallet.width,
+                                depth=pallet.depth,
+                                height=pallet.height,
+                                weight=pallet.weight,
+                                item_code=f'PALLET_{pallet.id}',
+                                quantity=1
                             )
-                            plans.append(plan)
-                            
-                            # 積載されたパレットを残りから削除
-                            for pallet in loaded_pallets:
-                                remaining_pallets.remove(pallet)
-                            
-                            truck_found = True
+                            group_boxes.append(box)
+                        else:
+                            can_fit_all = False
+                            print(f"注文 {order_id} のパレット {pallet.id} はサイズ制限により積載不可")
                             break
+                    
+                    if can_fit_all:
+                        # 現在選択中の他のパレットと一緒に2D配置をテスト
+                        temp_boxes = test_boxes + group_boxes
+                        temp_packer = BinPacking2D(truck.width, truck.depth)
+                        temp_positions = temp_packer.pack(temp_boxes)
+                        
+                        # 全てのパレットが配置できる場合のみ追加
+                        if temp_positions and len([p for p in temp_positions if p]) == len(temp_boxes):
+                            test_boxes.extend(group_boxes)
+                            test_pallets.extend(group_pallets)
+                            test_group_info.append((order_id, group_pallets))
+                            current_weight += group_weight
+                            print(f"注文 {order_id} ({len(group_pallets)}個のパレット, {group_weight}kg) を積載候補に追加")
+                        else:
+                            print(f"注文 {order_id} は2D配置制限により積載不可")
+                    
+                    # トラック容量の80%を超えたら次のトラックを検討
+                    if current_weight > truck_capacity * 0.8:
+                        break
+                
+                if test_group_info:
+                    # 最終的な2D配置を実行
+                    final_positions = packer.pack(test_boxes)
+                    
+                    if final_positions:
+                        # 積載された出荷依頼グループに対応する注文を特定
+                        loaded_orders = []
+                        for order_id, group_pallets in test_group_info:
+                            order = next((o for o in orders if o.id == order_id), None)
+                            if order:
+                                loaded_orders.append(order)
+                        
+                        # 配送計画を作成
+                        plan = self._create_delivery_plan_with_unified_pallets(
+                            truck, loaded_orders, target_date, test_pallets, final_positions[:len(test_pallets)]
+                        )
+                        plans.append(plan)
+                        
+                        # 積載された出荷依頼グループを残りから削除
+                        for order_id, group_pallets in test_group_info:
+                            remaining_order_groups = [(oid, gp) for oid, gp in remaining_order_groups if oid != order_id]
+                        
+                        print(f"トラック {truck.id} に {len(test_group_info)}個の出荷依頼を積載しました")
+                        truck_found = True
+                        break
             
             # どのトラックにも積載できなかった場合
             if not truck_found:
-                if remaining_pallets:
-                    print(f"警告: {len(remaining_pallets)}個のパレットがどのトラックにも積載できませんでした")
-                    # 最大のトラックを強制的に使用
+                if remaining_order_groups:
+                    print(f"警告: {len(remaining_order_groups)}個の出荷依頼がどのトラックにも積載できませんでした")
+                    # 最大のトラックを強制的に使用して、1つの出荷依頼を積載
                     truck = trucks[0]  # 最大積載量のトラック
-                    forced_pallets = remaining_pallets[:1]  # 1つずつ積載
+                    forced_order_id, forced_pallets = remaining_order_groups[0]
+                    forced_order = next((o for o in orders if o.id == forced_order_id), None)
                     
                     # 強制的に配送計画を作成
-                    plan = self._create_delivery_plan_with_unified_pallets(
-                        truck, orders, target_date, forced_pallets, [Position(0, 0)]
-                    )
-                    plans.append(plan)
+                    if forced_order:
+                        positions = []
+                        for pallet in forced_pallets:
+                            positions.append(Position(
+                                x=0, 
+                                y=0, 
+                                width=pallet.width, 
+                                depth=pallet.depth, 
+                                rotation=0
+                            ))
+                        plan = self._create_delivery_plan_with_unified_pallets(
+                            truck, [forced_order], target_date, forced_pallets, positions
+                        )
+                        plans.append(plan)
                     
-                    for pallet in forced_pallets:
-                        remaining_pallets.remove(pallet)
+                    # 処理した出荷依頼を削除
+                    remaining_order_groups = remaining_order_groups[1:]
+                    print(f"強制的に注文 {forced_order_id} を積載しました")
         
         return plans
     

@@ -95,7 +95,15 @@
             <div class="card mb-4">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">パレット #{{ pallet.pallet_number }}</h5>
+                        <div>
+                            <h5 class="mb-0">パレット #{{ pallet.pallet_number }}</h5>
+                            <div class="mt-1">
+                                <span class="text-muted small">出荷依頼: </span>
+                                {% for order_id in pallet.get_related_order_numbers %}
+                                    <span class="badge bg-light text-dark me-1">{{ order_id }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
                         <div>
                             <span class="badge bg-info">積載率: {{ pallet.utilization|floatformat:1 }}%</span>
                             <span class="badge bg-secondary">重量: {{ pallet.total_weight|floatformat:1 }}kg</span>
@@ -131,20 +139,20 @@
                                         <div class="card border-0 bg-light">
                                             <div class="card-body p-2">
                                                 <h6 class="card-title text-success mb-1">主な商品</h6>
-                                                <p class="card-text mb-0">
-                                                    {% for item in pallet.items.all|slice:":3" %}
-                                                        <span class="badge bg-secondary me-1">
-                                                            {% if item.part %}
-                                                                {{ item.part.parts_code }}
-                                                            {% else %}
-                                                                {{ item.item.item_code }}
-                                                            {% endif %}
-                                                        </span>
+                                                <div class="mb-0">
+                                                    {% for item_summary in pallet.get_item_summary %}
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <div>
+                                                                <span class="badge bg-primary me-1">{{ item_summary.item_code }}</span>
+                                                                <small class="text-dark">{{ item_summary.item_name|truncatechars:20 }}</small>
+                                                            </div>
+                                                            <span class="badge bg-secondary">{{ item_summary.quantity }}個</span>
+                                                        </div>
                                                     {% endfor %}
                                                     {% if pallet.items.count > 3 %}
-                                                        <span class="text-muted">...他{{ pallet.items.count|add:"-3" }}個</span>
+                                                        <div class="text-muted small">...他の商品あり</div>
                                                     {% endif %}
-                                                </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
