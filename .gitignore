@@ -37,3 +37,7 @@ staticfiles/
 ehthumbs.db
 Thumbs.db
 logistics_optimization.code-workspace
+DATABASE_SCHEMA.md
+DELIVERY_PLAN_DELETE.md
+NEW_MODEL_DESIGN.md
+PALLET_BASED_REDESIGN_SUMMARY.md
